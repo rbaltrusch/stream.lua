@@ -47,21 +47,25 @@ An added benefit of using the library is that performance seems to be better tha
 
 ### Single iterator functions provided
 
-- `iter(Iterable): Iterator`: turns a table or string into an iterator. If the argument isn't a table, this function assumes it must be an iterator function.
-- `filter(Iterable, any => boolean): Iterator`: yields all elements for which the supplied predicate function returns `true`.
-- `map(Iterator | table, any => any): Iterator`: applies the supplied mapping function to each element and yields them.
-- `flatmap(Iterable, any => table<X>): Iterator<X>`: applies the supplied function to each element and flattens the resulting iterator of tables to a flat iterator containing all elements.
-- `limit(Iterable, int): Iterator`: limits the iterator to yield at most the specified maximum number of elements.
-- `each(Iterable, any => void): void`: applies the supplied consumer function to each element in the `Iterator`. This is a terminal operation.
-- `collect(Iterable): table`: collects all elements of the iterator into a table. This is a terminal operation
+- `iter(Iterable<T>): Iterator<T>`: constructs an `Iterator` from a table or string. If the argument isn't a table or string, this function assumes it must be an iterator function of type `() => T`. Note that a stateless iterator function (e.g. `function() return 1 end`) results in infinite iterators.
+- `range(start: int, stop: int, step: int?): Iterator<int>`: constructs a numeric `Iterator` yielding numbers from start to stop (including both ends). Takes an optional `step` parameter.
+- `filter(Iterable<T>, T => boolean): Iterator<T>`: yields all elements for which the supplied predicate function returns `true`.
+- `map(Iterator<T>, T => S): Iterator<S>`: applies the supplied mapping function to each element and yields them.
+- `reduce(Iterable<T>, T, (T, T) => T): T`: applies the supplied combining (bi-operator) function to all adjacent element pairs in the iterable, starting with the specified seed, then returns the result. This is a terminal operation.
+- `flatmap(Iterable<T>, T => table<S>): Iterator<S>`: applies the supplied function to each element and flattens the resulting iterator of tables to a flat iterator containing all elements.
+- `limit(Iterable<T>, int): Iterator<T>`: limits the iterator to yield at most the specified maximum number of elements.
+- `skip(Iterable<T>, int): Iterator<T>`: skips the specified number of elements at the beginning of the iterator.
+- `each(Iterable<T>, any => void): void`: applies the supplied consumer function to each element in the `Iterator`. This is a terminal operation.
+- `collect(Iterable<T>): table<T>`: collects all elements of the iterator into a table. This is a terminal operation.
+- `collect(Iterable<T>, collector): table<T>`: collects all elements of the iterator into an arbitrary format specified by the collector. Collectors provided by `stream.lua` are available under `collectors`. This is a terminal operation.
 
 ### Stream objects
 
 A `Stream` object, which allows iterator chaining, can be constructed using the following constructors:
-- `Stream.from(Iterable): Stream`: constructs a `Stream` object from the specified iterable.
+- `Stream.from(Iterable<T>): Stream<T>`: constructs a `Stream` object from the specified iterable.
 - `Stream.range(start: int, stop: int, step: int?): Stream`: constructs a `Stream` object containing the numbers between the specified start and stop numbers (both ends included). The step between each number can optionally be specified and defaults to 1.
 
-`Stream` objects provide the same iterator interface in chainable format: `iter`, `filter`, `map`, `flatmap`, `each`, `limit`, and `collect` (see more detailed documentation on each above).
+`Stream` objects provide the same iterator interface in chainable format: `iter`, `filter`, `map`, `reduce`, `flatmap`, `each`, `limit`, `skip`, and `collect` (see more detailed documentation on each above).
 
 Example iterator chaining:
 
@@ -73,6 +77,23 @@ local max = fn.Stream.from({1, 5, 283428, 104, -10399232, 293428})
 ```
 
 ### Utilities
+
+#### zip
+
+The provided `zip` function allows combining two `Iterable` objects into a single `Iterator` yielding pairs sourced from both iterables, for example:
+
+```lua
+local fn = require "stream"
+local numbers = {1, 2, 3}
+local chars = {"a", "b", "c"}
+for number, char in fn.zip(numbers, chars) do
+    print(number, char) -- prints (1, "a"), then (2, "b"), then (3, "c")
+end
+```
+
+Note that the `Iterator` returned by the `zip` function stops yielding element pairs upon exhaustion of the shortest of the two iterables.
+
+#### partial
 
 A utility function called `partial` is also provided, which can be used to reduce the arity (amount of arguments) of a function: `partial(function, args...)`, for example:
 

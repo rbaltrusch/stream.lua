@@ -1,12 +1,33 @@
--- todo zip, any, all
--- todo stream-api: generate(supplier), peek(consumer), skip(amount), collect(collector), partition(predicate), parallel ?
+-- todo any, all, takewhile, dropwhile, sorted, reversed ?
+-- todo stream-api: peek(consumer) ?
+-- todo cycle
+-- todo add operators
+-- todo inline documentation
 
----@alias Iterator fun(): any
----@alias Iterable table | string | Iterator
+---@generic T
+---@class Iterator<T>: (fun(): T)
+---@class Iterable<T>: table<T> | string | Iterator<T>
 
----@param iterable Iterable
----@return Iterator
+---@generic T
+---@generic S: any
+---@class CollectorInstance<T>
+---@field collect fun(T): nil
+---@field get fun(): S
+
+---@generic T
+---@generic S: any
+---@class Collector<T>: (fun(): CollectorInstance<T>)
+
+local nil_iterator = function() return nil end
+
+---@generic T
+---@param iterable Iterable<T>?
+---@return Iterator<T>
 local function iter(iterable)
+    if iterable == nil then
+        return nil_iterator
+    end
+
     local type_ = type(iterable)
     if type_ == "table" then
         local index = 0
@@ -21,9 +42,54 @@ local function iter(iterable)
     return iterable
 end
 
----@param iterable Iterable
----@param predicate fun(any): boolean
----@return Iterator
+-- Note: produces an infinite iterator when step is 0
+---@nodiscard
+---@param start number
+---@param stop number
+---@param step number?
+---@return Iterator<number>
+local function range(start, stop, step)
+    step = step or 1
+    local value = start - step
+
+    local comparator = (
+        step >= 0
+        and function(x, y) return x <= y end
+        or function(x, y) return x >= y end
+    )
+
+    return function()
+        value = value + step
+        return comparator(value, stop) and value or nil
+    end
+end
+
+---@nodiscard
+---@generic T
+---@generic S
+---@param first Iterable<T>
+---@param second Iterable<S>
+---@return Iterator<[T, S]>
+local function zip(first, second)
+    local first_iterator = iter(first)
+    local second_iterator = iter(second)
+    return function()
+        while true do
+            local first_value = first_iterator()
+            local second_value = second_iterator()
+            if first_value == nil or second_value == nil then
+                break
+            end
+            return first_value, second_value
+        end
+    end
+end
+
+---@nodiscard
+---@generic T
+---@param iterable Iterable<T>
+---@param predicate fun(T): boolean
+---@return Iterator<T>
 local function filter(iterable, predicate)
     local iterator = iter(iterable)
     return function()
@@ -36,9 +102,12 @@ local function filter(iterable, predicate)
     end
 end
 
----@param iterable Iterable
----@param mapper fun(any): any
----@return Iterator
+---@nodiscard
+---@generic T
+---@generic S
+---@param iterable Iterable<T>
+---@param mapper fun(T): S
+---@return Iterator<S>
 local function map(iterable, mapper)
     local iterator = iter(iterable)
     return function()
@@ -47,9 +116,12 @@ local function map(iterable, mapper)
     end
 end
 
----@param iterable Iterable
----@param mapper fun(any): Iterable
----@return Iterator
+---@nodiscard
+---@generic T
+---@generic S
+---@param iterable Iterable<T>
+---@param mapper fun(T): Iterable<S>
+---@return Iterator<S>
 local function flatmap(iterable, mapper)
     local iterator = iter(iterable)
     local inner_iterator
@@ -72,9 +144,11 @@ local function flatmap(iterable, mapper)
     end
 end
 
----@param iterable Iterable
+---@nodiscard
+---@generic T
+---@param iterable Iterable<T>
 ---@param amount number
----@return Iterator
+---@return Iterator<T>
 local function limit(iterable, amount)
     local iterator = iter(iterable)
     local count = 0
@@ -84,26 +158,36 @@ local function limit(iterable, amount)
     end
 end
 
----@param iterable Iterable
----@param consumer fun(any)
+---@generic T
+---@param iterable Iterable<T>
+---@param amount number
+---@return Iterator<T>
+local function skip(iterable, amount)
+    local iterator = iter(iterable)
+    local value
+    for _ = 1, amount do
+        value = iterator()
+        if value == nil then
+            return nil_iterator
+        end
+    end
+    return iterator
+end
+
+---@generic T
+---@param iterable Iterable<T>
+---@param consumer fun(T): nil
 local function each(iterable, consumer)
     for value in iter(iterable) do
         consumer(value)
     end
 end
 
-local function collect(iterable)
-    local list = {}
-    for value in iter(iterable) do
-        table.insert(list, value)
-    end
-    return list
-end
-
----@param iterable Iterable
----@param seed any
----@param binary_operation fun(any, any): any
----@return any
+---@generic T
+---@param iterable Iterable<T>
+---@param seed T
+---@param binary_operation fun(T, T): T
+---@return T
 local function reduce(iterable, seed, binary_operation)
     local accumulated = seed
     for value in iter(iterable) do
@@ -112,71 +196,144 @@ local function reduce(iterable, seed, binary_operation)
     return accumulated
 end
 
+---@nodiscard
 local function partial(fn, ...)
     local n, args = select('#', ...), { ... }
     return function(...)
+        ---@diagnostic disable-next-line: deprecated
         return fn(unpack(args, 1, n), ...)
     end
 end
 
+local operators = {
+    add = function(x, y) return x + y end
+}
+
+---@class Collectors
+---@field table fun(): CollectorInstance
+---@field sum fun(): CollectorInstance
+---@field join fun(string): fun(): CollectorInstance
+local collectors = {
+    table = function()
+        return {
+            value = {},
+            collect = function(self, x) table.insert(self.value, x) end,
+            get = function(self) return self.value end
+        }
+    end,
+    sum = function()
+        return {
+            value = 0,
+            collect = function(self, x) self.value = self.value + x end,
+            get = function(self) return self.value end
+        }
+    end,
+    join = function (delimiter)
+        return function()
+            return {
+                value = "",
+                delimiter = delimiter,
+                collect = function(self, x) self.value = self.value == "" and x or self.value .. delimiter .. x end,
+                get = function(self) return self.value end
+            }
+        end
+    end
+}
+
+---@generic T
+---@param iterable Iterable<T>
+---@param collector Collector<T>?
+---@return table<T>
+local function collect(iterable, collector)
+    collector = collector or collectors.table
+    local new_collector = collector()
+    each(iterable, partial(new_collector.collect, new_collector))
+    return new_collector:get()
+end
+
 local Stream = {}
 
----@param iterable Iterable
----@return Stream
+---@nodiscard
+---@generic T
+---@param iterable Iterable<T>
+---@return Stream<T>
 function Stream.from(iterable)
     ---@class Stream
     local stream = {
         iterator = iter(iterable)
     }
 
-    ---@param predicate fun(any): boolean
-    ---@return Stream
+    ---@nodiscard
+    ---@generic T
+    ---@param predicate fun(T): boolean
+    ---@return Stream<T>
     function stream:filter(predicate)
         self.iterator = filter(self.iterator, predicate)
         return self
     end
 
-    ---@param mapper fun(any): any
-    ---@return Stream
+    ---@nodiscard
+    ---@generic T
+    ---@generic S
+    ---@param mapper fun(T): S
+    ---@return Stream<T>
     function stream:map(mapper)
         self.iterator = map(self.iterator, mapper)
         return self
     end
 
-    ---@param mapper fun(any): any
-    ---@return Stream
+    ---@nodiscard
+    ---@generic T
+    ---@generic S
+    ---@param mapper fun(T): Iterable<S>
+    ---@return Stream<S>
     function stream:flatmap(mapper)
         self.iterator = flatmap(self.iterator, mapper)
         return self
     end
 
+    ---@nodiscard
+    ---@generic T
     ---@param amount number
-    ---@return Stream
+    ---@return Stream<T>
     function stream:limit(amount)
         self.iterator = limit(self.iterator, amount)
         return self
     end
 
+    ---@nodiscard
+    ---@generic T
+    ---@param amount number
+    ---@return Stream<T>
+    function stream:skip(amount)
+        self.iterator = skip(self.iterator, amount)
+        return self
+    end
+
     ---@param consumer fun(any)
+    ---@return nil
     function stream:each(consumer)
         each(self.iterator, consumer)
     end
 
-    ---@return table
-    function stream:collect()
-        return collect(self.iterator)
+    ---@generic T
+    ---@param collector Collector<T>?
+    ---@return table<T>
+    function stream:collect(collector)
+        return collect(self.iterator, collector)
     end
 
-    ---@param seed any
-    ---@param binary_operation fun(any, any): any
-    ---@return any
+    ---@generic T
+    ---@param seed T
+    ---@param binary_operation fun(T, T): T
+    ---@return T
     function stream:reduce(seed, binary_operation)
         return reduce(self.iterator, seed, binary_operation)
     end
 
     setmetatable(stream, {
-        __call = function() return stream.iterator() end,
-        __index = function() return stream.iterator() end,
+        __call = stream.iterator,
+        __index = stream.iterator,
     })
     return stream
 end
@@ -190,24 +347,25 @@ setmetatable(Stream, {
 ---@param step number?
 ---@return Stream
 function Stream.range(start, stop, step)
-    step = step or 1
-    local value = start - step
-    return Stream.from(
-        function()
-            value = value + step
-            return value <= stop and value or nil
-        end
-    )
+    return Stream.from(range(start, stop, step))
 end
+
+local stream = Stream.from
 
 return {
     iter = iter,
+    range = range,
     filter = filter,
     map = map,
     flatmap = flatmap,
+    reduce = reduce,
     limit = limit,
+    skip = skip,
     each = each,
     collect = collect,
     partial = partial,
+    zip = zip,
+    stream = stream,
     Stream = Stream,
+    collectors = collectors,
 }
