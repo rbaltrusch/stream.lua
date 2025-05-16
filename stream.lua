@@ -140,7 +140,10 @@ local function map(iterable, mapper)
     local iterator = iter(iterable)
     return function()
         local value = iterator()
-        return value ~= nil and mapper(value) or nil
+        if value == nil then
+            return nil
+        end
+        return mapper(value)
     end
 end
 
