@@ -315,10 +315,9 @@ local collectors = {
     join = function (delimiter)
         return function()
             return {
-                value = "",
-                delimiter = delimiter,
-                collect = function(self, x) self.value = self.value == "" and x or self.value .. delimiter .. x end,
-                get = function(self) return self.value end
+                value = {},
+                collect = function(self, x) table.insert(self.value, x) end,
+                get = function(self) return table.concat(self.value, delimiter or "") end
             }
         end
     end
