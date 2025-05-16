@@ -256,6 +256,13 @@ local collectors = {
             get = function(self) return self.value end
         }
     end,
+    count = function()
+        return {
+            value = 0,
+            collect = function(self, _) self.value = self.value + 1 end,
+            get = function(self) return self.value end
+        }
+    end,
     join = function (delimiter)
         return function()
             return {
@@ -349,6 +356,13 @@ function Stream.from(iterable)
     ---@return table<T>
     function stream:collect(collector)
         return collect(self.iterator, collector)
+    end
+
+    ---@generic T
+    ---@param self Stream<T>
+    ---@return number
+    function stream:count()
+        return self:collect(collectors.count)
     end
 
     ---@generic T
