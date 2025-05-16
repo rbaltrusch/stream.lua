@@ -149,6 +149,39 @@ end
 
 ---@nodiscard
 ---@generic T
+---@param iterable Iterable<T>
+---@param predicate (fun(T): boolean)
+---@return Iterator<T>
+local function takewhile(iterable, predicate)
+    local function mapper(x)
+        local include = predicate(x)
+        if include then
+            return x
+        end
+        return nil
+    end
+    return map(iterable, mapper)
+end
+
+---@nodiscard
+---@generic T
+---@param iterable Iterable<T>
+---@param predicate (fun(T): boolean)
+---@return Iterator<T>
+local function dropwhile(iterable, predicate)
+    local started = false
+    local function wrapped_predicate(x)
+        local exclude = predicate(x)
+        if not exclude then
+            started = true
+        end
+        return started
+    end
+    return filter(iterable, wrapped_predicate)
+end
+
+---@nodiscard
+---@generic T
 ---@generic S
 ---@param iterable Iterable<T>
 ---@param mapper fun(T): Iterable<S>
@@ -289,6 +322,23 @@ local function collect(iterable, collector)
     return new_collector:get()
 end
 
+---@generic T
+---@param iterable Iterable<T>
+---@return Iterator<T>
+local function cycle(iterable)
+    local list = collect(iterable)
+    local infinite = function() return 0 end
+    return flatmap(infinite, function(_) return iter(list) end)
+end
+
+---@generic T
+---@param iterable Iterable<T>
+---@return Iterator<T>
+local function reversed(iterable)
+    local list = collect(iterable)
+    return map(range(#list, 1, -1), function(index) return list[index] end)
+end
+
 local Stream = {}
 
 ---@nodiscard
@@ -400,10 +450,14 @@ local stream = Stream.from
 return {
     iter = iter,
     range = range,
+    cycle = cycle,
+    reversed = reversed,
     filter = filter,
     map = map,
     flatmap = flatmap,
     reduce = reduce,
+    dropwhile = dropwhile,
+    takewhile = takewhile,
     limit = limit,
     skip = skip,
     each = each,
