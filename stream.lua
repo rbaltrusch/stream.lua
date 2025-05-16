@@ -1,7 +1,3 @@
--- todo any, all, takewhile, dropwhile, sorted, reversed ?
--- todo stream-api: peek(consumer) ?
--- todo cycle
--- todo add operators
 -- todo inline documentation
 
 ---@generic T
@@ -301,10 +297,16 @@ local function all(iterable, predicate)
     return reduce(mapped, true, operators.and_)
 end
 
+---@generic T
+---@alias tabler fun(): CollectorInstance<T, table<T>>
+---@alias summer fun(): CollectorInstance<T, number>
+---@alias counter fun(): CollectorInstance<T, number>
+---@alias joiner fun(string): fun(): CollectorInstance<string, string>
 ---@class Collectors
----@field table fun(): CollectorInstance
----@field sum fun(): CollectorInstance
----@field join fun(string): fun(): CollectorInstance
+---@field table tabler
+---@field sum summer
+---@field count counter
+---@field join joiner
 local collectors = {
     table = function()
         return {
@@ -339,9 +341,10 @@ local collectors = {
 }
 
 ---@generic T
+---@generic S
 ---@param iterable Iterable<T>
----@param collector Collector<T>?
----@return table<T>
+---@param collector Collector<T, S>?
+---@return S
 local function collect(iterable, collector)
     collector = collector or collectors.table
     local new_collector = collector()
@@ -374,12 +377,14 @@ local Stream = {}
 ---@return Stream<T>
 function Stream.from(iterable)
     ---@class Stream
+    ---@field iterator Iterator<T>
     local stream = {
         iterator = iter(iterable)
     }
 
     ---@nodiscard
     ---@generic T
+    ---@param self Stream<T>
     ---@param predicate (fun(T): boolean)?
     ---@return Stream<T>
     function stream:filter(predicate)
@@ -390,6 +395,7 @@ function Stream.from(iterable)
     ---@nodiscard
     ---@generic T
     ---@generic S
+    ---@param self Stream<T>
     ---@param mapper fun(T): S
     ---@return Stream<T>
     function stream:map(mapper)
@@ -400,6 +406,7 @@ function Stream.from(iterable)
     ---@nodiscard
     ---@generic T
     ---@generic S
+    ---@param self Stream<T>
     ---@param mapper fun(T): Iterable<S>
     ---@return Stream<S>
     function stream:flatmap(mapper)
@@ -409,6 +416,7 @@ function Stream.from(iterable)
 
     ---@nodiscard
     ---@generic T
+    ---@param self Stream<T>
     ---@param amount number
     ---@return Stream<T>
     function stream:limit(amount)
@@ -418,6 +426,7 @@ function Stream.from(iterable)
 
     ---@nodiscard
     ---@generic T
+    ---@param self Stream<T>
     ---@param amount number
     ---@return Stream<T>
     function stream:skip(amount)
@@ -450,8 +459,10 @@ function Stream.from(iterable)
     end
 
     ---@generic T
-    ---@param collector Collector<T>?
-    ---@return table<T>
+    ---@generic S
+    ---@param self Stream<T>
+    ---@param collector Collector<T, S>?
+    ---@return S
     function stream:collect(collector)
         return collect(self.iterator, collector)
     end
@@ -464,6 +475,7 @@ function Stream.from(iterable)
     end
 
     ---@generic T
+    ---@param self Stream<T>
     ---@param seed T
     ---@param binary_operation fun(T, T): T
     ---@return T
