@@ -282,9 +282,24 @@ local function partial(fn, ...)
     end
 end
 
-local operators = {
-    add = function(x, y) return x + y end
-}
+---@generic T
+---@param iterable Iterable<T>
+---@param predicate (fun(T): boolean)?
+---@return boolean
+local function any(iterable, predicate)
+    local filtered = filter(iterable, predicate)
+    local mapped = map(filtered, operators.truthy)
+    return mapped() or false
+end
+
+---@generic T
+---@param iterable Iterable<T>
+---@param predicate (fun(T): boolean)?
+---@return boolean
+local function all(iterable, predicate)
+    local mapped = map(iterable, predicate or operators.truthy)
+    return reduce(mapped, true, operators.and_)
+end
 
 ---@class Collectors
 ---@field table fun(): CollectorInstance
@@ -425,6 +440,15 @@ function Stream.from(iterable)
         each(self.iterator, consumer)
     end
 
+    ---@nodiscard
+    ---@generic T
+    ---@param self Stream<T>
+    ---@param predicate (fun(T): boolean)?
+    ---@return boolean
+    function stream:all(predicate)
+        return all(self.iterator, predicate)
+    end
+
     ---@generic T
     ---@param collector Collector<T>?
     ---@return table<T>
@@ -486,6 +510,8 @@ return {
     collect = collect,
     partial = partial,
     zip = zip,
+    any = any,
+    all = all,
     stream = stream,
     Stream = Stream,
     collectors = collectors,
