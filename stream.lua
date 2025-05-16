@@ -115,10 +115,11 @@ end
 ---@nodiscard
 ---@generic T
 ---@param iterable Iterable<T>
----@param predicate fun(T): boolean
+---@param predicate (fun(T): boolean)?
 ---@return Iterator<T>
 local function filter(iterable, predicate)
     local iterator = iter(iterable)
+    predicate = predicate or operators.truthy
     return function()
         repeat
             local value = iterator()
@@ -292,7 +293,7 @@ function Stream.from(iterable)
 
     ---@nodiscard
     ---@generic T
-    ---@param predicate fun(T): boolean
+    ---@param predicate (fun(T): boolean)?
     ---@return Stream<T>
     function stream:filter(predicate)
         self.iterator = filter(self.iterator, predicate)
