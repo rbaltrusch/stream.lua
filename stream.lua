@@ -9,16 +9,43 @@
 ---@class Iterable<T>: table<T> | string | Iterator<T>
 
 ---@generic T
----@generic S: any
----@class CollectorInstance<T>
+---@generic S
+---@class CollectorInstance<T, S>
 ---@field collect fun(T): nil
 ---@field get fun(): S
 
 ---@generic T
----@generic S: any
 ---@class Collector<T>: (fun(): CollectorInstance<T>)
 
 local nil_iterator = function() return nil end
+
+local operators = {
+    add = function(x, y) return x + y end,
+    sub = function(x, y) return x - y end,
+    mul = function(x, y) return x * y end,
+    div = function(x, y) return x / y end,
+    mod = function(x, y) return x % y end,
+    pow = function(x, y) return x ^ y end,
+    neg = function(x) return -x end,
+    and_ = function(x, y) return x and y end,
+    or_ = function(x, y) return x or y end,
+    not_ = function(x) return not x end,
+    truthy = function(x) return not not x end,
+    -- band = function(x, y) return x & y end,
+    -- bor = function(x, y) return x | y end,
+    -- bnot = function(x) return ~x end,
+    -- xor = function(x, y) return x ~ y end,
+    -- lshift = function(x, y) return x << y end,
+    -- rshift = function(x, y) return x >> y end,
+    eq = function(x, y) return x == y end,
+    neq = function(x, y) return x ~= y end,
+    gt = function(x, y) return x > y end,
+    lt = function(x, y) return x < y end,
+    gte = function(x, y) return x >= y end,
+    lte = function(x, y) return x <= y end,
+    concat = function(x, y) return x .. y end,
+    len = function(x) return #x end,
+}
 
 ---@generic T
 ---@param iterable Iterable<T>?
@@ -368,4 +395,5 @@ return {
     stream = stream,
     Stream = Stream,
     collectors = collectors,
+    operators = operators,
 }
