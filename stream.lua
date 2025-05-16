@@ -261,6 +261,19 @@ local function reduce(iterable, seed, binary_operation)
 end
 
 ---@nodiscard
+---@generic T
+---@param iterable Iterable<T>
+---@param consumer fun(T): nil
+---@return Iterator<T>
+local function peek(iterable, consumer)
+    local mapper = function (x)
+        consumer(x)
+        return x
+    end
+    return map(iterable, mapper)
+end
+
+---@nodiscard
 local function partial(fn, ...)
     local n, args = select('#', ...), { ... }
     return function(...)
@@ -398,6 +411,15 @@ function Stream.from(iterable)
         return self
     end
 
+    ---@generic T
+    ---@param self Stream<T>
+    ---@param consumer fun(any)
+    ---@return Stream<T>
+    function stream:peek(consumer)
+        self.iterator = peek(self.iterator, consumer)
+        return self
+    end
+
     ---@param consumer fun(any)
     ---@return nil
     function stream:each(consumer)
@@ -461,6 +483,7 @@ return {
     limit = limit,
     skip = skip,
     each = each,
+    peek = peek,
     collect = collect,
     partial = partial,
     zip = zip,
