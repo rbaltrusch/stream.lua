@@ -43,12 +43,32 @@ local operators = {
     len = function(x) return #x end,
 }
 
+-- An empty iterator that yields no items.
+local nil_iterator = function() return nil end
+
+local stream_metatable = {}
+local function is_stream(x)
+    local metatable = getmetatable(x)
+    return metatable ~= nil and getmetatable(metatable) == stream_metatable
+end
+
+-- Returns an iterator function that can be used to iterate through the input iterable:
+-- * input nil => empty iterator
+-- * input table => iterator through the table
+-- * input string => iterator through the string
+-- * input Stream => the stream iterator
+-- * input iterator => itself
+-- * input anything else => raises an error
 ---@generic T
 ---@param iterable Iterable<T>?
 ---@return Iterator<T>
 local function iter(iterable)
     if iterable == nil then
         return nil_iterator
+    end
+
+    if is_stream(iterable) then
+        return iterable.iterator
     end
 
     local type_ = type(iterable)
@@ -62,7 +82,10 @@ local function iter(iterable)
     if type_ == "string" then
         return iterable:gmatch(".")
     end
-    return iterable
+    if type_ == "function" then
+        return iterable
+    end
+    error("Cannot convert object of type '" .. type_ .. "' to an iterator!", 2)
 end
 
 -- Note: produces an infinite iterator when step is 0
@@ -483,10 +506,12 @@ function Stream.from(iterable)
         return reduce(self.iterator, seed, binary_operation)
     end
 
-    setmetatable(stream, {
+    local metatable = {
         __call = stream.iterator,
         __index = stream.iterator,
-    })
+    }
+    setmetatable(metatable, stream_metatable)
+    setmetatable(stream, metatable)
     return stream
 end
 
