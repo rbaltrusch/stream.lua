@@ -4,6 +4,7 @@ local fn = require("stream")
 TestStream = {}
 local stream = fn.stream
 local Stream = fn.Stream
+local op = fn.operators
 
 function TestStream:testIter()
     local expected = 1
@@ -45,6 +46,21 @@ function TestStream:testIterInfinite()
     test.assertEquals(sum, 5)
 end
 
+function TestStream:testIterFail()
+    local status, message = pcall(fn.iter, false)
+    test.assertFalse(status)
+    test.assertEquals("Cannot convert object of type 'boolean' to an iterator!", message)
+end
+
+function TestStream:testIterStream()
+    test.assertEquals(fn.collect(fn.iter(stream{2, 4, 5})), {2, 4, 5})
+end
+
+function TestStream:testIterFilteredStream()
+    local predicate = function(x) return x > 3 end
+    test.assertEquals(fn.collect(fn.iter(stream{2, 4, 5}:filter(predicate))), {4, 5})
+end
+
 function TestStream:testZip()
     local sum = 0
     for first, second in fn.zip({1, 4, 0}, {2, 3, 4, 5}) do
@@ -73,6 +89,37 @@ function TestStream:testZipCollect()
     test.assertEquals(fn.collect(fn.zip({1, 2, 3}, {2, 3, 4})), {1, 2, 3})
 end
 
+-- here, zipping is also disregarded by Stream.concat
+function TestStream:testStreamConcatZip()
+    local zipped = fn.zip({1, 3, 5}, {2, 4, 6})
+    test.assertEquals(fn.Stream.concat(zipped):collect(), {1, 3, 5})
+end
+
+-- here, the multivalues yielded by zipping are combined into a table using the multicollect function
+function TestStream:testMulticollectZip()
+    local zipped = fn.zip({1, 2, 3}, {3, 5, 7})
+    local expected = {{1, 3}, {2, 5}, {3, 7}}
+    test.assertEquals(fn.collect(fn.multicollect(zipped)), expected)
+end
+
+function TestStream:testMapMultiCollectZip()
+    local zipped = fn.multicollect(fn.zip({3, 5, 7, 6, 4}, {true, false, true, true}))
+    test.assertEquals(stream(zipped):filter(op.second):map(op.first):reduce(0, op.add), 16)
+end
+
+function TestStream:testMultiCollectIter()
+    test.assertEquals(fn.collect(fn.multicollect{1, 2, 3}), {{1}, {2}, {3}})
+end
+
+function TestStream:testFlatmapMultiCollectIter()
+    test.assertEquals(fn.collect(fn.flatmap(fn.multicollect{1, 2, 3}, op.id)), {1, 2, 3})
+end
+
+function TestStream:testFlatMapMultiCollectZip()
+    local zipped = fn.zip({1, 3, 5}, {2, 4, 6})
+    test.assertEquals(fn.collect(fn.flatmap(fn.multicollect(zipped), op.id)), {1, 2, 3, 4, 5, 6})
+end
+
 function TestStream:testStreamIterator()
     local expected = 1
     for x in stream({1, 2, 3}) do
@@ -81,8 +128,16 @@ function TestStream:testStreamIterator()
     end
 end
 
+function TestStream:testEmptyStream()
+    test.assertEquals(fn.stream():collect(), {})
+end
+
 function TestStream:testStreamConstructor()
     test.assertEquals(fn.stream({1, 2, 3}):collect(), {1, 2, 3})
+end
+
+function TestStream:testStreamStream()
+    test.assertEquals(stream(stream{-1, 3, -5}):filter(function(x) return x < 0 end):collect(), {-1, -5})
 end
 
 function TestStream:testStreamCall()
@@ -106,6 +161,10 @@ end
 
 function TestStream:testStreamFilter()
     test.assertEquals(stream({1, 2, 3, 4, 5}):filter(function(x) return x % 2 == 1 end):collect(), {1, 3, 5})
+end
+
+function TestStream:testStreamFilterOperator()
+    test.assertEquals(stream{2, 4, 5}:filter(fn.partial(op.lt, 3)):collect(), {4, 5})
 end
 
 function TestStream:testStreamMap()
@@ -201,6 +260,10 @@ end
 function TestStream:testStreamAll()
     test.assertTrue(stream{1, 2, 3}:all(function(x) return x > 0 end))
     test.assertFalse(stream{1, -2, 3}:all(function(x) return x > 0 end))
+end
+
+function TestStream:testStreamConcat()
+    test.assertEquals(fn.Stream.concat({1}, stream{2, 3}, fn.iter(), stream{5}):collect(), {1, 2, 3, 5})
 end
 
 function TestStream:integrationTest()
@@ -496,4 +559,20 @@ end
 
 function TestStream:testLength()
     test.assertEquals(fn.operators.len({3, 5, 7}), 3)
+end
+
+function TestStream:testId()
+    test.assertEquals(stream{1, false, "test"}:map(op.id):collect(), {1, false, "test"})
+end
+
+function TestStream:testFirst()
+    test.assertEquals(op.first({5, 3, 1}), 5)
+end
+
+function TestStream:testSecond()
+    test.assertEquals(op.second({5, 3, 2}), 3)
+end
+
+function TestStream:testIndex()
+    test.assertEquals(op.index(3, {5, 3, 4, 2}), 4)
 end
