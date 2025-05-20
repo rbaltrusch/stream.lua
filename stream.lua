@@ -398,6 +398,21 @@ local function collect(iterable, collector)
 end
 
 ---@generic T
+---@generic S
+---@param iterable Iterable<[T, S]>
+---@return Iterator<table<T | S>>
+local function multicollect(iterable)
+    local iterator = iter(iterable)
+    return function()
+        local list = {iterator()}
+        if list[1] == nil then
+            return nil
+        end
+        return list
+    end
+end
+
+---@generic T
 ---@param iterable Iterable<T>
 ---@return Iterator<T>
 local function cycle(iterable)
@@ -567,6 +582,7 @@ return {
     each = each,
     peek = peek,
     collect = collect,
+    multicollect = multicollect,
     partial = partial,
     zip = zip,
     any = any,
