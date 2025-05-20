@@ -41,6 +41,28 @@ local operators = {
     lte = function(x, y) return x <= y end,
     concat = function(x, y) return x .. y end,
     len = function(x) return #x end,
+
+    -- Returns the unchanged input (no op).
+    ---@generic T
+    ---@param x T
+    ---@return T
+    id = function(x) return x end,
+
+    -- Returns the result of `x[i]`.
+    ---@param i number | string
+    ---@param x table
+    ---@return any
+    index = function(i, x) return x[i] end,
+
+    -- Returns the first element of x.
+    ---@param x table
+    ---@return any
+    first = function(x) return x[1] end,
+
+    -- Returns the second element of x.
+    ---@param x table
+    ---@return any
+    second = function(x) return x[2] end,
 }
 
 -- An empty iterator that yields no items.
