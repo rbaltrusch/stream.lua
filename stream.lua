@@ -566,6 +566,14 @@ end
 
 local stream = Stream.from
 
+---@generic T
+---@vararg Stream<T> | Iterator<T>
+---@return Stream<T>
+function Stream.concat(...)
+    local streams = {...}
+    return stream(flatmap(streams, iter))
+end
+
 return {
     iter = iter,
     range = range,
