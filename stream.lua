@@ -27,6 +27,11 @@
 ---@generic T
 ---@class Collector<T>: (fun(): CollectorInstance<T>)
 
+-- Backwards compatibility for Lua 5.1 and below
+---@diagnostic disable-next-line: deprecated
+table.unpack = table.unpack or unpack
+table.pack = table.pack or function(...) return { n = select("#", ...), ... } end
+
 -- A list of all Lua operators exposed as functions.
 local operators = {
 
@@ -247,27 +252,6 @@ end
 
 ---@nodiscard
 ---@generic T
----@generic S
----@param first Iterable<T>
----@param second Iterable<S>
----@return Iterator<[T, S]>
-local function zip(first, second)
-    local first_iterator = iter(first)
-    local second_iterator = iter(second)
-    return function()
-        while true do
-            local first_value = first_iterator()
-            local second_value = second_iterator()
-            if first_value == nil or second_value == nil then
-                break
-            end
-            return first_value, second_value
-        end
-    end
-end
-
----@nodiscard
----@generic T
 ---@param iterable Iterable<T>
 ---@param predicate (fun(T): boolean)?
 ---@return Iterator<T>
@@ -431,8 +415,7 @@ end
 local function partial(fn, ...)
     local n, args = select('#', ...), { ... }
     return function(...)
-        ---@diagnostic disable-next-line: deprecated
-        return fn(unpack(args, 1, n), ...)
+        return fn(table.unpack(args, 1, n), ...)
     end
 end
 
@@ -555,6 +538,27 @@ local function collect(iterable, collector)
     local new_collector = collector()
     each(iterable, partial(new_collector.collect, new_collector))
     return new_collector:get()
+end
+
+-- Returns an iterator function that yields items from all iterables provided.
+---@nodiscard
+---@vararg Iterable
+---@return Iterator<[any...]>
+local function zip(...)
+    local iterators = collect(map({...}, iter))
+    local amount = #iterators
+    return function()
+        while true do
+            local values = collect(map(iterators, operators.call))
+
+            -- preserves nils
+            local value_iter = map(range(1, amount), function(x) return {values[x]} end)
+            if any(value_iter, function(x) return x[1] == nil end) then
+                return nil
+            end
+            return table.unpack(values)
+        end
+    end
 end
 
 ---@generic T

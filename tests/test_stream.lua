@@ -69,6 +69,14 @@ function TestStream:testZip()
     test.assertEquals(sum, 1 * 2 + 4 * 3)
 end
 
+function TestStream:testZipMany()
+    local values = {}
+    for a, b, c, d in fn.zip({1, 4, 0}, {4, 1, -3}, fn.range(1, 3), "abc") do
+        table.insert(values, {a, b, c, d})
+    end
+    test.assertEquals(values, {{1, 4, 1, "a"}, {4, 1, 2, "b"}, {0, -3, 3, "c"}})
+end
+
 function TestStream:testZipEmpty()
     test.assertEquals(fn.collect(fn.zip({1, 2, 3}, {})), {})
 end
@@ -99,6 +107,12 @@ end
 function TestStream:testMulticollectZip()
     local zipped = fn.zip({1, 2, 3}, {3, 5, 7})
     local expected = {{1, 3}, {2, 5}, {3, 7}}
+    test.assertEquals(fn.collect(fn.multicollect(zipped)), expected)
+end
+
+function TestStream:testMulticollectZipMany()
+    local zipped = fn.zip({1, 4, 0}, {4, 1, -3}, fn.range(1, 3), "abc")
+    local expected = {{1, 4, 1, "a"}, {4, 1, 2, "b"}, {0, -3, 3, "c"}}
     test.assertEquals(fn.collect(fn.multicollect(zipped)), expected)
 end
 
