@@ -600,6 +600,16 @@ function Stream.from(iterable)
     ---@nodiscard
     ---@generic T
     ---@param self Stream<T>
+    ---@param mapper fun(iterator: Iterator<T>): Iterator<T>
+    ---@return Stream<T>
+    function stream:apply(mapper)
+        iterator = mapper(iterator)
+        return self
+    end
+
+    ---@nodiscard
+    ---@generic T
+    ---@param self Stream<T>
     ---@param predicate (fun(T): boolean)?
     ---@return Stream<T>
     function stream:filter(predicate)
@@ -730,6 +740,37 @@ function Stream.concat(...)
     return stream(flatmap(streams, iter))
 end
 
+---@generic T
+---@alias IteratorMapper fun(iterable: Iterable<T>): Iterator<T>
+---@class Gatherers
+---@field batch fun(batch_size: number): IteratorMapper
+local gatherers = {
+
+    -- Can be used to gather items yielded from an iterable into batches of a specified size.
+    -- <br/>Example: `Stream.range(1, 6):apply(gatherers.batch(2)):collect()` results in `{{1, 2}, {3, 4} {5, 6}}`.
+    -- <br/>Note: this is a factory function for an iterator function factory.
+    batch = function (batch_size)
+        if batch_size <= 0 then
+            error("Specified batch size should be greater than zero!", 2)
+        end
+
+        -- iterator function factory
+        return function(iterable)
+            local iterator = iter(iterable)
+
+            -- the actual iterator function
+            return function()
+                local values = {}
+                Stream.range(1, batch_size):each(function(_) table.insert(values, iterator()) end)
+                if values[1] == nil then
+                    return nil
+                end
+                return values
+            end
+        end
+    end
+}
+
 return {
     iter = iter,
     range = range,
@@ -754,5 +795,6 @@ return {
     stream = stream,
     Stream = Stream,
     collectors = collectors,
+    gatherers = gatherers,
     operators = operators,
 }
