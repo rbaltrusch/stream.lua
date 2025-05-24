@@ -761,7 +761,7 @@ local gatherers = {
             -- the actual iterator function
             return function()
                 local values = {}
-                Stream.range(1, batch_size):each(function(_) table.insert(values, iterator()) end)
+                each(range(1, batch_size), function(_) table.insert(values, iterator()) end)
                 if values[1] == nil then
                     return nil
                 end
