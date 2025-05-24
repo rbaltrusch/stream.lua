@@ -450,46 +450,93 @@ local function all(iterable, predicate)
 end
 
 ---@generic T
+---@param binary_operation fun(T, T): T
+---@param default_value T?
+---@return fun(): CollectorInstance<T, T?>
+local function _create_collector(binary_operation, default_value)
+    return function()
+        local value = default_value
+        return {
+            collect = function(self, x)
+                value = value == default_value and x or binary_operation(value, x)
+            end,
+            get = function(self) return value end
+        }
+    end
+end
+
+---@generic T
 ---@alias tabler fun(): CollectorInstance<T, table<T>>
----@alias summer fun(): CollectorInstance<T, number>
----@alias counter fun(): CollectorInstance<T, number>
----@alias joiner fun(string): fun(): CollectorInstance<string, string>
+---@alias numeric fun(): CollectorInstance<T, number>
+---@alias optional_numeric fun(): CollectorInstance<number, number?>
+---@alias optional fun(): CollectorInstance<T, T?>
+---@alias joiner fun(delimiter?: string): fun(): CollectorInstance<string, string>
 ---@class Collectors
 ---@field table tabler
----@field sum summer
----@field count counter
+---@field sum numeric
+---@field count numeric
+---@field min optional_numeric
+---@field max optional_numeric
+---@field average optional_numeric
+---@field last optional
 ---@field join joiner
 local collectors = {
     table = function()
+        local value = {}
         return {
-            value = {},
-            collect = function(self, x) table.insert(self.value, x) end,
-            get = function(self) return self.value end
+            collect = function(self, x) table.insert(value, x) end,
+            get = function(self) return value end
         }
     end,
-    sum = function()
-        return {
-            value = 0,
-            collect = function(self, x) self.value = self.value + x end,
-            get = function(self) return self.value end
-        }
-    end,
-    count = function()
-        return {
-            value = 0,
-            collect = function(self, _) self.value = self.value + 1 end,
-            get = function(self) return self.value end
-        }
-    end,
-    join = function (delimiter)
-        return function()
+    sum = _create_collector(operators.add, 0),
+    count = _create_collector(partial(operators.add, 1), 0),
+    min = _create_collector(math.min),
+    max = _create_collector(math.max),
+    join = function(delimiter)
+        local function join()
+            local value = {}
             return {
-                value = {},
-                collect = function(self, x) table.insert(self.value, x) end,
-                get = function(self) return table.concat(self.value, delimiter or "") end
+                collect = function(self, x) table.insert(value, x) end,
+                get = function(self) return table.concat(value, delimiter or "") end
             }
         end
-    end
+
+        local collector = {}
+        setmetatable(collector, {
+            __call = join,
+
+            -- default collector table
+            -- allows joining a stream also with the syntax stream:collect(collectors.join)
+            -- instead of stream:collect(collectors.join())
+            __index = join(),
+        })
+        return collector --[[@as fun(): CollectorInstance<string, string>]]
+    end,
+    last = function()
+        local value = nil
+        return {
+            collect = function(self, x) value = x end,
+            get = function(self) return value end
+        }
+    end,
+    average = function()
+        return function()
+            local sum = 0
+            local count = 0
+            return {
+                collect = function(self, x)
+                    sum = sum + x
+                    count = count + x
+                end,
+                get = function(self)
+                    if count == 0 then
+                        return nil
+                    end
+                    return sum / count
+                end
+            }
+        end
+    end,
 }
 
 ---@generic T
