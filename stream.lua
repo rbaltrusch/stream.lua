@@ -1,45 +1,150 @@
--- todo inline documentation
+---A functional programming library providing implementations of common lazy iterators,
+-- such as `map`, `filter` and `reduce`, both in standalone form, as well as in a chainable
+-- form via the `Stream` class (e.g. `stream{1, 2, 3}:filter(...):map(...):limit(5):collect()`)
+--
+-- Author: R. Baltrusch
 
+-- todo: separate range function
+-- todo: distinct (unique)
+-- todo Stream gatherers (moving window)
+
+-- A function that yields items, or `nil` to signify termination. Can be used in generic for-loops.
 ---@generic T
----@class Iterator<T>: (fun(): T)
----@class Iterable<T>: table<T> | string | Iterator<T>
+---@class Iterator<T> fun(): T?
 
+-- An object that can act as input to the `iter` function: either a table, a string, or an iterator.
+---@generic T
+---@class Iterable<T>: table<T> | string | Iterator<T> | Stream<T>
+
+-- An object that aggregates an entire iterable into another form, such as a table or length count.
 ---@generic T
 ---@generic S
 ---@class CollectorInstance<T, S>
 ---@field collect fun(T): nil
 ---@field get fun(): S
 
+-- A function that builds and returns a new `CollectorInstance`.
 ---@generic T
 ---@class Collector<T>: (fun(): CollectorInstance<T>)
 
-local nil_iterator = function() return nil end
-
+-- A list of all Lua operators exposed as functions.
 local operators = {
+
+    -- Adds two numbers.
+    ---@param x number
+    ---@param y number
+    ---@return number
     add = function(x, y) return x + y end,
+
+    -- Subtracts two numbers.
+    ---@param x number
+    ---@param y number
+    ---@return number
     sub = function(x, y) return x - y end,
+
+    -- Multiplies two numbers.
+    ---@param x number
+    ---@param y number
+    ---@return number
     mul = function(x, y) return x * y end,
+
+    -- Divides two numbers.
+    ---@param x number
+    ---@param y number
+    ---@return number
     div = function(x, y) return x / y end,
+
+    -- Returns the remainder of integer division x by y (modulus).
+    ---@param x number
+    ---@param y number
+    ---@return number
     mod = function(x, y) return x % y end,
+
+    -- Returns the exponentiation of x to the power of y.
+    ---@param x number
+    ---@param y number
+    ---@return number
     pow = function(x, y) return x ^ y end,
+
+    -- Returns the unary negation of x.
+    ---@param x number
+    ---@return number
     neg = function(x) return -x end,
+
+    -- Returns the result of `x and y`.
+    ---@param x any
+    ---@param y any
+    ---@return any
     and_ = function(x, y) return x and y end,
+
+    -- Returns the result of `x or y`.
+    ---@param x any
+    ---@param y any
+    ---@return any
     or_ = function(x, y) return x or y end,
+
+    -- Returns the result of `not x`.
+    ---@param x any
+    ---@return any
     not_ = function(x) return not x end,
+
+    -- Returns true if x is truthy, otherwise returns false.
+    ---@param x any
+    ---@return any
     truthy = function(x) return not not x end,
+
     -- band = function(x, y) return x & y end,
     -- bor = function(x, y) return x | y end,
     -- bnot = function(x) return ~x end,
     -- xor = function(x, y) return x ~ y end,
     -- lshift = function(x, y) return x << y end,
     -- rshift = function(x, y) return x >> y end,
+
+    -- Returns the result of `x == y`.
+    ---@param x any
+    ---@param y any
+    ---@return boolean
     eq = function(x, y) return x == y end,
+
+    -- Returns the result of `x ~= y`.
+    ---@param x any
+    ---@param y any
+    ---@return boolean
     neq = function(x, y) return x ~= y end,
+
+    -- Returns the result of `x > y`.
+    ---@param x any
+    ---@param y any
+    ---@return boolean
     gt = function(x, y) return x > y end,
+
+    -- Returns the result of `x < y`.
+    ---@param x any
+    ---@param y any
+    ---@return boolean
     lt = function(x, y) return x < y end,
+
+    -- Returns the result of `x >= y`.
+    ---@param x any
+    ---@param y any
+    ---@return boolean
     gte = function(x, y) return x >= y end,
+
+    -- Returns the result of `x <= y`.
+    ---@param x any
+    ---@param y any
+    ---@return boolean
     lte = function(x, y) return x <= y end,
+
+    -- Returns the concatenation of x and y.
+    ---@param x string
+    ---@param y string
+    ---@return string
     concat = function(x, y) return x .. y end,
+
+    -- Returns the length of x (as determined by the `#` operator).
+    ---@param x any
+    ---@return number
     len = function(x) return #x end,
 
     -- Returns the unchanged input (no op).
@@ -110,7 +215,9 @@ local function iter(iterable)
     error("Cannot convert object of type '" .. type_ .. "' to an iterator!", 2)
 end
 
--- Note: produces an infinite iterator when step is 0
+-- Returns an iterator function yielding numbers from `start` to `stop` (including both ends).
+-- A `step`
+-- Note: produces an infinite iterator when `step` is 0 and `start` != `stop`.
 ---@nodiscard
 ---@param start number
 ---@param stop number
@@ -433,7 +540,7 @@ local Stream = {}
 
 ---@nodiscard
 ---@generic T
----@param iterable Iterable<T>
+---@param iterable Iterable<T>?
 ---@return Stream<T>
 function Stream.from(iterable)
     ---@class Stream
