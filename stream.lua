@@ -195,7 +195,7 @@ local function iter(iterable)
     end
 
     if is_stream(iterable) then
-        return iterable.iterator
+        return iterable
     end
 
     local type_ = type(iterable)
@@ -590,11 +590,12 @@ local Stream = {}
 ---@param iterable Iterable<T>?
 ---@return Stream<T>
 function Stream.from(iterable)
-    ---@class Stream
-    ---@field iterator Iterator<T>
-    local stream = {
-        iterator = iter(iterable)
-    }
+
+    ---@generic T
+    ---@class Stream<T>
+    local stream = {}
+
+    local iterator = iter(iterable)
 
     ---@nodiscard
     ---@generic T
@@ -602,7 +603,7 @@ function Stream.from(iterable)
     ---@param predicate (fun(T): boolean)?
     ---@return Stream<T>
     function stream:filter(predicate)
-        self.iterator = filter(self.iterator, predicate)
+        iterator = filter(iterator, predicate)
         return self
     end
 
@@ -613,7 +614,7 @@ function Stream.from(iterable)
     ---@param mapper fun(T): S
     ---@return Stream<T>
     function stream:map(mapper)
-        self.iterator = map(self.iterator, mapper)
+        iterator = map(iterator, mapper)
         return self
     end
 
@@ -624,7 +625,7 @@ function Stream.from(iterable)
     ---@param mapper fun(T): Iterable<S>
     ---@return Stream<S>
     function stream:flatmap(mapper)
-        self.iterator = flatmap(self.iterator, mapper)
+        iterator = flatmap(iterator, mapper)
         return self
     end
 
@@ -634,7 +635,7 @@ function Stream.from(iterable)
     ---@param amount number
     ---@return Stream<T>
     function stream:limit(amount)
-        self.iterator = limit(self.iterator, amount)
+        iterator = limit(iterator, amount)
         return self
     end
 
@@ -644,7 +645,7 @@ function Stream.from(iterable)
     ---@param amount number
     ---@return Stream<T>
     function stream:skip(amount)
-        self.iterator = skip(self.iterator, amount)
+        iterator = skip(iterator, amount)
         return self
     end
 
@@ -653,14 +654,14 @@ function Stream.from(iterable)
     ---@param consumer fun(any)
     ---@return Stream<T>
     function stream:peek(consumer)
-        self.iterator = peek(self.iterator, consumer)
+        iterator = peek(iterator, consumer)
         return self
     end
 
     ---@param consumer fun(any)
     ---@return nil
     function stream:each(consumer)
-        each(self.iterator, consumer)
+        each(iterator, consumer)
     end
 
     ---@nodiscard
@@ -669,7 +670,7 @@ function Stream.from(iterable)
     ---@param predicate (fun(T): boolean)?
     ---@return boolean
     function stream:all(predicate)
-        return all(self.iterator, predicate)
+        return all(iterator, predicate)
     end
 
     ---@generic T
@@ -678,7 +679,7 @@ function Stream.from(iterable)
     ---@param collector Collector<T, S>?
     ---@return S
     function stream:collect(collector)
-        return collect(self.iterator, collector)
+        return collect(iterator, collector)
     end
 
     ---@generic T
@@ -694,21 +695,22 @@ function Stream.from(iterable)
     ---@param binary_operation fun(T, T): T
     ---@return T
     function stream:reduce(seed, binary_operation)
-        return reduce(self.iterator, seed, binary_operation)
+        return reduce(iterator, seed, binary_operation)
+    end
+
+    -- this function wrapping looks redundant but is required because stream.iterator can change.
+    local function stream_iter()
+        return iterator()
     end
 
     local metatable = {
-        __call = stream.iterator,
-        __index = stream.iterator,
+        __call = stream_iter,
+        __index = stream_iter,
     }
     setmetatable(metatable, stream_metatable)
     setmetatable(stream, metatable)
     return stream
 end
-
-setmetatable(Stream, {
-    __call = Stream.from,
-})
 
 ---@param start number
 ---@param stop number
