@@ -673,3 +673,11 @@ end
 function TestStream:testIndex()
     test.assertEquals(op.index(3, {5, 3, 4, 2}), 4)
 end
+
+function TestStream:testCall()
+    test.assertEquals(op.call(print), nil)
+    test.assertEquals(op.call(op.id, 1), 1)
+    test.assertEquals(op.call(fn.partial(op.add, 2), 3), 5)
+    test.assertEquals(op.call(op.mul, 3, 4), 12)
+    test.assertEquals(op.call(table.pack, 1, 5, 4, 1), {1, 5, 4, 1, n = 4})
+end

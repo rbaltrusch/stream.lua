@@ -153,6 +153,12 @@ local operators = {
     ---@return T
     id = function(x) return x end,
 
+    -- Calls the first input with all other arguments and returns the result.
+    ---@generic T
+    ---@param x fun(...): T
+    ---@return T
+    call = function(x, ...) return x(...) end,
+
     -- Returns the result of `x[i]`.
     ---@param i number | string
     ---@param x table
