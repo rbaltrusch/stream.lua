@@ -122,10 +122,47 @@ end
 
 function TestStream:testStreamIterator()
     local expected = 1
-    for x in stream({1, 2, 3}) do
+    for x in stream{1, 2, 3} do
         test.assertEquals(x, expected)
         expected = expected + 1
     end
+end
+
+function TestStream:testStreamFilterMapIterator()
+    local expected = 3
+    -- expects 3 and 5 to be yielded, the original 2 gets skipped.
+    for x in stream{1, 2, 3}:filter(function (x) return x % 2 == 1 end):map(fn.partial(op.add, 2)) do
+        test.assertEquals(x, expected)
+        expected = expected + 2
+    end
+end
+
+function TestStream:testManualIterationStreamFilterMap()
+    -- expects 3 and 5 to be yielded, the original 2 gets skipped.
+    local stream_ = stream{1, 2, 3}:filter(function (x) return x % 2 == 1 end):map(fn.partial(op.add, 2))
+    test.assertEquals(stream_(), 3)
+    test.assertEquals(stream_(), 5)
+    test.assertEquals(stream_(), nil)
+end
+
+function TestStream:testStreamApplyTakewhile()
+    local is_positive = fn.partial(op.lt, 0)
+    local mapper = function(iter) return fn.takewhile(iter, is_positive) end
+    test.assertEquals(stream{1, 5, 10, -2, 3, 0, 4, -5, 4}:apply(mapper):collect(), {1, 5, 10})
+end
+
+function TestStream:testStreamApplyMap()
+    local increment = fn.partial(op.add, 1)
+    local mapper = function(iter) return fn.map(iter, increment) end
+    test.assertEquals(stream{1, 5, 10}:apply(mapper):collect(), {2, 6, 11})
+end
+
+function TestStream:testStreamApplyBatcher()
+    local batch = fn.gatherers.batch
+    test.assertEquals(stream{}:apply(batch(3)):collect(), {})
+    test.assertEquals(fn.Stream.range(1, 4):apply(batch(2)):collect(), {{1, 2}, {3, 4}})
+    test.assertEquals(fn.Stream.range(1, 7):apply(batch(3)):collect(), {{1, 2, 3}, {4, 5, 6}, {7}})
+    test.assertEquals(fn.Stream.range(1, 9):apply(batch(3)):map(function(table) return fn.collect(table, fn.collectors.sum) end):collect(), {(1 + 2 + 3), (4 + 5 + 6), (7 + 8 + 9)})
 end
 
 function TestStream:testEmptyStream()
@@ -175,8 +212,16 @@ function TestStream:testStreamLimit()
     test.assertEquals(stream({1, 3, 5, 7}):limit(3):collect(), {1, 3, 5})
 end
 
+function TestStream:testStreamMultipleLimits()
+    test.assertEquals(stream({1, 3, 5, 7, 9}):limit(3):limit(5):collect(), {1, 3, 5})
+end
+
 function TestStream:testStreamSkip()
     test.assertEquals(stream({1, 2, 3}):skip(1):collect(), {2, 3})
+end
+
+function TestStream:testStreamMultipleSkips()
+    test.assertEquals(stream({1, 2, 3}):skip(1):skip(1):collect(), {3})
 end
 
 function TestStream:testStreamSkipLimit()
@@ -185,6 +230,10 @@ end
 
 function TestStream:testStreamLimitSkip()
     test.assertEquals(stream({1, 2, 3}):limit(1):skip(1):collect(), {})
+end
+
+function TestStream:testStreamFilterSkipLimit()
+    test.assertEquals(fn.Stream.range(1, 100, 2):filter(fn.partial(op.lt, 5)):skip(1):limit(2):skip(1):collect(), {11})
 end
 
 function TestStream:testStreamEach()
@@ -219,12 +268,24 @@ function TestStream:testStreamSum()
     test.assertEquals(Stream.range(1, 5):collect(fn.collectors.sum), 15)
 end
 
+function TestStream:testStreamSumOne()
+    test.assertEquals(stream({3}):collect(fn.collectors.sum), 3)
+end
+
 function TestStream:testStreamSumEmpty()
     test.assertEquals(stream({}):collect(fn.collectors.sum), 0)
 end
 
 function TestStream:testStreamJoin()
     test.assertEquals(stream("abc"):collect(fn.collectors.join(";")), "a;b;c")
+end
+
+function TestStream:testStreamJoinNoCall()
+    -- test whether join collector can also be used without being called first
+    -- additionally test whether it is stateless (as it should be).
+    local join = fn.collectors.join
+    test.assertEquals(stream("abce"):collect(join), "abce")
+    test.assertEquals(stream("def"):collect(join), "def")
 end
 
 function TestStream.testVeryLongStreamJoin()
@@ -236,6 +297,38 @@ function TestStream:testStreamJoinEmpty()
     test.assertEquals(stream({}):collect(fn.collectors.join(";")), "")
 end
 
+function TestStream:testStreamLast()
+    test.assertEquals(stream{5, -20, 3, 7, -22, 6}:collect(fn.collectors.last), 6)
+end
+
+function TestStream:testStreamEmptyLast()
+    test.assertEquals(stream{}:collect(fn.collectors.last), nil)
+end
+
+function TestStream:testStreamMax()
+    test.assertEquals(stream{5, -20, 3, 7, -22, 6}:collect(fn.collectors.max), 7)
+end
+
+function TestStream:testStreamMaxOne()
+    test.assertEquals(stream({3}):collect(fn.collectors.max), 3)
+end
+
+function TestStream:testStreamEmptyMax()
+    test.assertEquals(stream{}:collect(fn.collectors.max), nil)
+end
+
+function TestStream:testStreamMin()
+    test.assertEquals(stream{5, -20, 3, 7, -22, 6, -3}:collect(fn.collectors.min), -22)
+end
+
+function TestStream:testStreamMinOne()
+    test.assertEquals(stream({3}):collect(fn.collectors.min), 3)
+end
+
+function TestStream:testStreamEmptyMin()
+    test.assertEquals(stream{}:collect(fn.collectors.min), nil)
+end
+
 function TestStream:testInfiniteStream()
     local infinite = fn.iter(function() return 1 end)
     test.assertEquals(stream(infinite):limit(5):collect(), {1, 1, 1, 1, 1})
@@ -243,6 +336,10 @@ end
 
 function TestStream:testStreamCount()
     test.assertEquals(stream({1, 2, 3}):count(), 3)
+end
+
+function TestStream:testStreamCountEmpty()
+    test.assertEquals(stream{}:count(), 0)
 end
 
 function TestStream:testStreamPeek()
