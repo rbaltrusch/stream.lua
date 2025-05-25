@@ -210,6 +210,9 @@ local function iter(iterable)
     end
 
     local type_ = type(iterable)
+    if type_ == "function" then
+        return iterable
+    end
     if type_ == "table" then
         local index = 0
         return function()
@@ -219,9 +222,6 @@ local function iter(iterable)
     end
     if type_ == "string" then
         return iterable:gmatch(".")
-    end
-    if type_ == "function" then
-        return iterable
     end
     error("Cannot convert object of type '" .. type_ .. "' to an iterator!", 2)
 end
