@@ -617,11 +617,13 @@ end
 
 ---@generic T
 ---@param iterable Iterable<T>
+---@param repeats number?
 ---@return Iterator<T>
-local function cycle(iterable)
+local function cycle(iterable, repeats)
     local list = collect(iterable)
     local infinite = function() return 0 end
-    return flatmap(infinite, function(_) return iter(list) end)
+    local mapped = flatmap(infinite, function(_) return iter(list) end)
+    return repeats and limit(mapped, repeats * #list) or mapped
 end
 
 ---@generic T

@@ -613,6 +613,10 @@ function TestStream:testCycle()
     test.assertEquals(fn.collect(fn.limit(fn.cycle({1, 2, 3}), 10)), {1, 2, 3, 1, 2, 3, 1, 2, 3, 1})
 end
 
+function TestStream:testCycleAmounts()
+    test.assertEquals(fn.collect(fn.cycle({1, 2, 3}, 2)), {1, 2, 3, 1, 2, 3})
+end
+
 function TestStream:testAdd()
     test.assertEquals(fn.operators.add(2, 3), 5)
 end
