@@ -527,8 +527,28 @@ function TestStream:testSkipTable()
     test.assertEquals(fn.collect(fn.skip({1, 2, 3, 4, 5}, 3)), {4, 5})
 end
 
+function TestStream:testSkipEmptyTable()
+    test.assertEquals(fn.collect(fn.skip({}, 3)), {})
+end
+
 function TestStream:testSkipAllTable()
     test.assertEquals(fn.collect(fn.skip({1, 2, 3, 4, 5}, 6)), {})
+end
+
+-- Tests that the skip function is lazy and is not computed ahead of time
+function TestStream:testLazySkip()
+    local iterated = false
+    local range_iter = fn.range(1, 10)
+    local iterator = function()
+        iterated = true
+        return range_iter()
+    end
+
+    local skipped = fn.skip(iterator, 1)
+    test.assertFalse(iterated, "lazy skip should not iterate")
+
+    fn.collect(skipped)
+    test.assertTrue(iterated)
 end
 
 function TestStream:testForEachTable()

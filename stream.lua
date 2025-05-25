@@ -405,14 +405,23 @@ end
 ---@return Iterator<T>
 local function skip(iterable, amount)
     local iterator = iter(iterable)
-    local value
-    for _ = 1, amount do
-        value = iterator()
-        if value == nil then
-            return nil_iterator
+    local skipped = false
+    return function()
+        if skipped then
+            return iterator()
         end
+
+        local value
+        for _ = 1, amount do
+            value = iterator()
+            if value == nil then
+                return nil
+            end
+        end
+
+        skipped = true
+        return iterator()
     end
-    return iterator
 end
 
 ---@generic T
