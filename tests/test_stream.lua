@@ -61,6 +61,50 @@ function TestStream:testIterFilteredStream()
     test.assertEquals(fn.collect(fn.iter(stream{2, 4, 5}:filter(predicate))), {4, 5})
 end
 
+function TestStream:testObjectKeys()
+    local result = fn.collect(fn.keys{a = 1, b = 2, c = false, d = nil})
+    table.sort(result)
+    test.assertEquals(result, {"a", "b", "c"})
+end
+
+function TestStream:testObjectKeysEmpty()
+    test.assertEquals(fn.collect(fn.keys{}), {})
+end
+
+function TestStream:testArrayKeys()
+    test.assertEquals(fn.collect(fn.keys{3, 5, 1}), {1, 2, 3})
+end
+
+function TestStream:testObjectValues()
+    local result = fn.collect(fn.values{a = 1, b = 2, c = 3, d = nil})
+    table.sort(result)
+    test.assertEquals(result, {1, 2, 3})
+end
+
+function TestStream:testObjectValuesFalse()
+    test.assertEquals(fn.collect(fn.values{a = false}), {false})
+end
+
+function TestStream:testObjectValuesEmpty()
+    test.assertEquals(fn.collect(fn.values{}), {})
+end
+
+function TestStream:testObjectItems()
+    local result = fn.collect(fn.items{a = 1, b = 2, c = false, d = nil})
+    table.sort(result, function (a, b) return a[1] < b[1] end)
+    test.assertEquals(result, {{"a", 1}, {"b", 2}, {"c", false}})
+end
+
+function TestStream:testObjectItemsEmpty()
+    test.assertEquals(fn.collect(fn.items{}), {})
+end
+
+function TestStream:testArrayItems()
+    local result = fn.collect(fn.items{"a", "b", "c"})
+    table.sort(result, function (a, b) return a[1] < b[1] end)
+    test.assertEquals(result, {{1, "a"}, {2, "b"}, {3, "c"}})
+end
+
 function TestStream:testZip()
     local sum = 0
     for first, second in fn.zip({1, 4, 0}, {2, 3, 4, 5}) do

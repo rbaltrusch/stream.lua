@@ -226,6 +226,45 @@ local function iter(iterable)
     error("Cannot convert object of type '" .. type_ .. "' to an iterator!", 2)
 end
 
+---@generic T
+---@generic S
+---@param object table<T, S>
+---@return Iterator<T>
+local function keys(object)
+    local key
+    return function()
+        key = next(object, key)
+        return key
+    end
+end
+
+---@generic T
+---@generic S
+---@param object table<T, S>
+---@return Iterator<T>
+local function values(object)
+    local key, value
+    return function()
+        key, value = next(object, key)
+        return value
+    end
+end
+
+---@generic T
+---@generic S
+---@param object table<T, S>
+---@return Iterator<table<T | S>>
+local function items(object)
+    local key, value
+    return function()
+        key, value = next(object, key)
+        if key == nil and value == nil then
+            return nil
+        end
+        return {key, value}
+    end
+end
+
 -- Returns an iterator function yielding numbers from `start` to `stop` (including both ends).
 -- A `step`
 -- Note: produces an infinite iterator when `step` is 0 and `start` != `stop`.
@@ -784,6 +823,9 @@ local gatherers = {
 return {
     iter = iter,
     range = range,
+    keys = keys,
+    values = values,
+    items = items,
     cycle = cycle,
     reversed = reversed,
     filter = filter,
