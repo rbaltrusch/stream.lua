@@ -387,6 +387,14 @@ function TestStream:testStreamEmptyMin()
     test.assertEquals(stream{}:collect(fn.collectors.min), nil)
 end
 
+function TestStream:testStreamAverage()
+    test.assertEquals(fn.Stream.range(1, 6):collect(fn.collectors.average), 3.5)
+end
+
+function TestStream:testStreamEmptyAverage()
+    test.assertEquals(stream{}:collect(fn.collectors.average), nil)
+end
+
 function TestStream:testInfiniteStream()
     local infinite = fn.iter(function() return 1 end)
     test.assertEquals(stream(infinite):limit(5):collect(), {1, 1, 1, 1, 1})
