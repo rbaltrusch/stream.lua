@@ -557,22 +557,20 @@ local collectors = {
         }
     end,
     average = function()
-        return function()
-            local sum = 0
-            local count = 0
-            return {
-                collect = function(self, x)
-                    sum = sum + x
-                    count = count + x
-                end,
-                get = function(self)
-                    if count == 0 then
-                        return nil
-                    end
-                    return sum / count
+        local sum = 0
+        local count = 0
+        return {
+            collect = function(self, x)
+                sum = sum + x
+                count = count + 1
+            end,
+            get = function(self)
+                if count == 0 then
+                    return nil
                 end
-            }
-        end
+                return sum / count
+            end
+        }
     end,
 }
 
