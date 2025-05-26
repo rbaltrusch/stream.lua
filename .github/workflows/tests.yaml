@@ -1,0 +1,32 @@
+name: Test
+
+on: [ push, pull_request ]
+
+jobs:
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        lua_version: [ "5.4", "5.3", "5.2", "5.1", 'luajit-2.0', 'luajit-2.1' ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up Lua
+        uses: luarocks/gh-actions-lua@master
+        with:
+          luaVersion: ${{ matrix.lua_version }}
+
+      - name: Set up LuaRocks
+        uses: luarocks/gh-actions-luarocks@master
+
+      - name: Setup dependencies
+        run: luarocks install luaunit
+
+      - name: Build luarock
+        run: luarocks build
+
+      - name: Run regression tests
+        run: luarocks test
