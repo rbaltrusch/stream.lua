@@ -4,9 +4,11 @@
 --
 -- Author: R. Baltrusch
 
--- todo: separate range function
 -- todo: distinct (unique)
--- todo Stream gatherers (moving window)
+-- todo: stream.any
+-- todo moving window stream gatherer
+-- todo expose each collector as separate function ? e.g. standalone join function
+-- todo change cycle from eager collection to lazy collection.
 
 -- A function that yields items, or `nil` to signify termination. Can be used in generic for-loops.
 ---@generic T
@@ -98,6 +100,7 @@ local operators = {
     ---@return any
     truthy = function(x) return not not x end,
 
+    -- bitwise operators are not available before Lua 5.3, so commenting them out for now...
     -- band = function(x, y) return x & y end,
     -- bor = function(x, y) return x | y end,
     -- bnot = function(x) return ~x end,
@@ -191,7 +194,7 @@ local function is_stream(x)
 end
 
 -- Returns an iterator function that can be used to iterate through the input iterable:
--- * input nil => empty iterator
+-- * input nil/unspecified => empty iterator
 -- * input table => iterator through the table
 -- * input string => iterator through the string
 -- * input Stream => the stream iterator
@@ -226,6 +229,8 @@ local function iter(iterable)
     error("Cannot convert object of type '" .. type_ .. "' to an iterator!", 2)
 end
 
+-- Returns an iterator function yielding all keys of the specified table in random order.
+-- <br>Note that this yields numeric indices for array tables.
 ---@generic T
 ---@generic S
 ---@param object table<T, S>
@@ -238,6 +243,7 @@ local function keys(object)
     end
 end
 
+-- Returns an iterator function yielding all values of the specified table in random order.
 ---@generic T
 ---@generic S
 ---@param object table<T, S>
@@ -250,6 +256,10 @@ local function values(object)
     end
 end
 
+-- Returns an iterator function yielding all key-value pairs, each packed into a table,
+-- of the specified table in random order.
+-- <br><br> Example: `items{a = 1, b = 2}` yields `{"a", 1}` and `{"b", 2}` (order not guaranteed).
+-- <br><br>Note that this yields numeric indices as keys for array tables.
 ---@generic T
 ---@generic S
 ---@param object table<T, S>
@@ -266,8 +276,10 @@ local function items(object)
 end
 
 -- Returns an iterator function yielding numbers from `start` to `stop` (including both ends).
--- A `step`
--- Note: produces an infinite iterator when `step` is 0 and `start` != `stop`.
+-- <br>An optional third `step` parameter can be provided to control the interval
+-- between the yielded numbers.
+-- <br><br>**Warning**: produces an infinite iterator when `step` is 0 and `start` != `stop`.
+-- <br><br>Example: `range(1, 5, 2)` yields 1, then 3, then 5.
 ---@nodiscard
 ---@param start number
 ---@param stop number
@@ -289,6 +301,10 @@ local function range(start, stop, step)
     end
 end
 
+-- Returns an iterator function yielding all items in the iterable for which
+-- the specified predicate tests truthy.
+-- <br>Filters out `false` values when no predicate function is specified.
+-- <br><br>Example: `filter({1, 2, 3}, function(x) return x % 2 == 0 end)` yields 1 and 3.
 ---@nodiscard
 ---@generic T
 ---@param iterable Iterable<T>
@@ -307,6 +323,9 @@ local function filter(iterable, predicate)
     end
 end
 
+-- Returns an iterator function yielding elements from the iterable, transformed
+-- by applying the specified mapper function to each original element individually.
+-- <br><br> Example: `map({1, 2, 3}, function(x) return x + 1 end)` yields 2, 3, and 4.
 ---@nodiscard
 ---@generic T
 ---@generic S
@@ -324,6 +343,9 @@ local function map(iterable, mapper)
     end
 end
 
+-- Returns an iterator function yielding elements from the iterable until the
+-- specified predicate tests false for an element for the first time.
+-- <br><br> Example: `takewhile({1, 2, -1, 3, -2}, function(x) return x > 0 end)` yields 1 and 2.
 ---@nodiscard
 ---@generic T
 ---@param iterable Iterable<T>
@@ -340,6 +362,10 @@ local function takewhile(iterable, predicate)
     return map(iterable, mapper)
 end
 
+-- Returns an iterator function skipping elements from the iterable until the
+-- specified predicate tests false for an element for the first time, then yields
+-- all remaining elements.
+-- <br><br> Example: `dropwhile({1, 2, -1, 3, -2}, function(x) return x > 0 end)` yields -1, 3, and -2
 ---@nodiscard
 ---@generic T
 ---@param iterable Iterable<T>
@@ -357,6 +383,10 @@ local function dropwhile(iterable, predicate)
     return filter(iterable, wrapped_predicate)
 end
 
+-- Returns an iterator function yielding elements from each result of applying
+-- the specified mapper function to each element in the iterable, resulting in
+-- a flat, un-nested iterable containing all mapping results.
+-- <br><br>Example: `flatmap({1, 2, 3} function(x) return {x, x})` yields 1, 1, 2, 2, 3, 3.
 ---@nodiscard
 ---@generic T
 ---@generic S
@@ -385,6 +415,9 @@ local function flatmap(iterable, mapper)
     end
 end
 
+-- Returns an iterator function yielding at most the specified `amount` of elements
+-- from the original iterable.
+-- <br><br> Example: `limit({3, 5, 7}, 1)` yields 3.
 ---@nodiscard
 ---@generic T
 ---@param iterable Iterable<T>
@@ -399,6 +432,9 @@ local function limit(iterable, amount)
     end
 end
 
+-- Returns an iterator function skipping the specified `amount` of elements
+-- at the start of the iterable, then yields all remaining elements.
+-- <br><br> Example: `skip({3, 5, 7}, 1)` yields 5 and 7.
 ---@generic T
 ---@param iterable Iterable<T>
 ---@param amount number
@@ -424,6 +460,9 @@ local function skip(iterable, amount)
     end
 end
 
+-- Calls the specified `consumer` function for each element yielded by the iterable.
+-- <br><br> **Note**: this is a **terminal operation**, returning nothing.
+-- <br><br> Example: `each({1, 2, 3}, print)` prints 1, then 2, then 3.
 ---@generic T
 ---@param iterable Iterable<T>
 ---@param consumer fun(T): nil
@@ -433,6 +472,10 @@ local function each(iterable, consumer)
     end
 end
 
+-- Aggregates all elements yielded by the iterable into a single result using
+-- the provided `seed` and the `binary_operation` aggregator function.
+-- <br><br> **Note**: this is a **terminal operation**.
+-- <br><br> Example: `reduce({1, 2, 3}, 0, operators.add)` returns 6.
 ---@generic T
 ---@param iterable Iterable<T>
 ---@param seed T
@@ -446,6 +489,17 @@ local function reduce(iterable, seed, binary_operation)
     return accumulated
 end
 
+-- Calls the `consumer` function for each element yielded by the iterable, then
+-- yields that element, allowing further iterator chaining. This is mostly useful
+-- for debugging complex iterator chains without collecting them.
+-- <br><br> Note that, unlike the `each` iterator, this is not a terminal operation.
+-- <br><br> Example:
+-- ```lua
+-- local increment = partial(operators.add, 1)
+-- local result = collect(peek(map({1, 2, 3}, increment), print))
+-- -- prints 2, then 3, then 4
+-- -- result itself is equal to {2, 3, 4}
+-- ```
 ---@nodiscard
 ---@generic T
 ---@param iterable Iterable<T>
@@ -459,14 +513,30 @@ local function peek(iterable, consumer)
     return map(iterable, mapper)
 end
 
+-- Reduces the arity (amount of arguments) of a function by returning a closure
+-- calling the specified function with all specified arguments pre-applied.
+-- <br><br>Example:
+-- ```lua
+-- function add(x, y) return x + y end
+-- increment = partial(add, 1)
+-- print(increment(2))  -- 3
+-- ```
 ---@nodiscard
+---@generic T
+---@param fn fun(...): T
+---@return fun(...): T
 local function partial(fn, ...)
-    local n, args = select('#', ...), { ... }
+    local args = { ... }
+    local n = select('#', ...)
     return function(...)
         return fn(table.unpack(args, 1, n), ...)
     end
 end
 
+-- Returns `true` if any element yielded by the iterable matches the specified
+-- predicate function, else returns `false`.
+-- <br><br> Note: returns `false` for empty iterables.
+-- <br><br>Example: `any({1, 3, 5, 4}, function(x) return x > 4 end)` returns `true`.
 ---@generic T
 ---@param iterable Iterable<T>
 ---@param predicate (fun(T): boolean)?
@@ -477,6 +547,10 @@ local function any(iterable, predicate)
     return mapped() or false
 end
 
+-- Returns `true` if all elements yielded by the iterable match the specified
+-- predicate function, else returns `false`.
+-- <br><br> Note: returns `true` for empty iterables.
+-- <br><br>Example: `all({1, 3, -1, 4}, function(x) return x > 0 end)` returns `false`.
 ---@generic T
 ---@param iterable Iterable<T>
 ---@param predicate (fun(T): boolean)?
@@ -502,6 +576,7 @@ local function _create_collector(binary_operation, default_value)
     end
 end
 
+---@see collect
 ---@generic T
 ---@alias tabler fun(): CollectorInstance<T, table<T>>
 ---@alias numeric fun(): CollectorInstance<T, number>
@@ -517,7 +592,13 @@ end
 ---@field average optional_numeric
 ---@field last optional
 ---@field join joiner
+-- Provides implementations for several useful collectors that can be used
+-- in conjunction with the `collect` or `stream.collect` functions to aggregate
+-- elements into a single result.
 local collectors = {
+
+    -- Collects an iterable to a table.
+    -- <br><br>Example: `collect(range(1, 5), collectors.table)` results in `{1, 2, 3, 4, 5}`.
     table = function()
         local value = {}
         return {
@@ -525,10 +606,32 @@ local collectors = {
             get = function(self) return value end
         }
     end,
+
+    -- Returns the sum of all numbers yielded by a numeric iterable.
+    -- <br><br>Example: `collect(range(1, 5), collectors.sum)` results in 15.
     sum = _create_collector(operators.add, 0),
+
+    -- Returns the count of elements yielded by an iterable.
+    -- <br><br>Example: `collect({1, 2, 3}, collectors.count)` results in 3.
     count = _create_collector(partial(operators.add, 1), 0),
+
+    -- Returns the smallest number yielded by a numeric iterable.
+    -- <br><br>Note: returns `nil` for empty iterables.
+    -- <br><br>Example: `collect({1, -1, 3}, collectors.min)` results in -1.
     min = _create_collector(math.min),
+
+    -- Returns the largest number yielded by a numeric iterable.
+    -- <br><br>Note: returns `nil` for empty iterables.
+    -- <br><br>Example: `collect({1, -1, 3}, collectors.max)` results in 3.
     max = _create_collector(math.max),
+
+    -- Returns a collector that joins all strings yielded by an iterable into
+    -- a single string, optionally delimited by the specified string delimiter.
+    -- <br><br>Note: although this is actually a collector *factory* function, it can
+    -- also be used as a collector without being called first.
+    -- <br><br>Examples:
+    -- * 1. `collect({"a", "d", "e"}, collectors.join)` results in `"ade"`.
+    -- * 2. `collect({"a", "b", "c"}, collectors.join(";"))` results in `"a;b;c"`.
     join = function(delimiter)
         local function join()
             local value = {}
@@ -542,13 +645,17 @@ local collectors = {
         setmetatable(collector, {
             __call = join,
 
-            -- default collector table
-            -- allows joining a stream also with the syntax stream:collect(collectors.join)
-            -- instead of stream:collect(collectors.join())
+            -- default collector table.
+            -- Allows joining a stream also with the syntax `stream:collect(collectors.join)`
+            -- instead of `stream:collect(collectors.join())`
             __index = join(),
         })
         return collector --[[@as fun(): CollectorInstance<string, string>]]
     end,
+
+    -- Returns the last element yielded by an iterable.
+    -- <br><br>Note: returns `nil` for empty iterables.
+    -- <br><br>Example: `collect({3, 5, 2}, collectors.last)` results in 2.
     last = function()
         local value = nil
         return {
@@ -556,6 +663,10 @@ local collectors = {
             get = function(self) return value end
         }
     end,
+
+    -- Returns the average of all numbers yielded by a numeric iterable.
+    -- <br><br>Note: returns `nil` for empty iterables.
+    -- <br><br>Example: `collect(range(1, 6), collectors.average)` results in `3.5`.
     average = function()
         local sum = 0
         local count = 0
@@ -574,6 +685,16 @@ local collectors = {
     end,
 }
 
+-- Collects the iterable to a single aggregated result using the specified collector,
+-- or to a table, if no collector is specified.
+-- <br><br>**Note**: this is a **terminal operation**.
+-- <br><br>**Warning**: collecting an infinite iterable will result in an infinite loop.
+-- <br><br>A collector is a table with this interface: `{collect = (item) -> nil, get = () -> aggregate} `.
+-- <br><br> Examples:
+-- * 1. `collect(range(1, 5))` returns `{1, 2, 3, 4, 5}`.
+-- * 2. `collect({"a", "b", "c"}, collectors.join(";"))` returns `"a;b;c"`.
+--
+---@see collectors
 ---@generic T
 ---@generic S
 ---@param iterable Iterable<T>
@@ -587,6 +708,16 @@ local function collect(iterable, collector)
 end
 
 -- Returns an iterator function that yields items from all iterables provided.
+-- <br><br>Example:
+-- ```lua
+-- local infinite_iter = function() return 0 end
+-- for x, y, z in zip(range(1, 5), {"a", "b", "c"}, infinite_iter) do
+--     print(x, y, z)
+--     -- prints 1, "a", 0
+--     -- then prints 2, "b", 0
+--     -- then prints 3, "c", 0
+-- end
+-- ```
 ---@nodiscard
 ---@vararg Iterable
 ---@return Iterator<[any...]>
@@ -607,6 +738,9 @@ local function zip(...)
     end
 end
 
+-- Returns an iterator function yielding tables containing the multivalues yielded
+-- by the original iterable.
+-- <br><br>Example: `multicollect(zip({1, 2, 3}, {3, 5, 7}))` yields `{1, 3}`, `{2, 5}` and `{3, 7}`.
 ---@generic T
 ---@generic S
 ---@param iterable Iterable<[T, S]>
@@ -622,6 +756,10 @@ local function multicollect(iterable)
     end
 end
 
+-- Returns an infinite iterator function repeatedly yielding elements from the iterable,
+-- or a specified amount of times if the optional `repeats` argument is specified.
+-- <br><br>**Note**: eagerly collects the original iterable.
+-- <br><br>Example: `cycle{1, 2}` yields 1, then 2, then 1, then 2...
 ---@generic T
 ---@param iterable Iterable<T>
 ---@param repeats number?
@@ -633,6 +771,9 @@ local function cycle(iterable, repeats)
     return repeats and limit(mapped, repeats * #list) or mapped
 end
 
+-- Returns an iterator function yielding elements from the iterable in reverse order.
+-- <br><br>**Note**: eagerly collects the original iterable.
+-- <br><br>Example: `reversed{1, 2, 3}` yields 3, then 2, then 1.
 ---@generic T
 ---@param iterable Iterable<T>
 ---@return Iterator<T>
@@ -641,20 +782,33 @@ local function reversed(iterable)
     return map(range(#list, 1, -1), function(index) return list[index] end)
 end
 
+-- `Stream` class, providing a fluent interface for lazily-computed iterator-chains.
 local Stream = {}
 
+-- Creates a `Stream` object from the specified iterable and returns it. This
+-- object provides a fluent interface for lazily-computed iterator-chains.
 ---@nodiscard
 ---@generic T
 ---@param iterable Iterable<T>?
 ---@return Stream<T>
 function Stream.from(iterable)
 
+    -- A `Stream` object, providing a fluent interface for lazily-computed iterator-chains.
     ---@generic T
     ---@class Stream<T>
     local stream = {}
 
     local iterator = iter(iterable)
 
+    -- Allows applying an arbitrary iterator transformation to this stream to
+    -- accomodate for iterator transformations not provided by the interface of
+    -- the `Stream` class.
+    -- <br><br>Example:
+    -- ```lua
+    -- local is_positive = function(x) return x > 0 end
+    -- local iter_mapper = function(it) return takewhile(it, is_positive) end
+    -- stream:apply(iter_mapper):collect()
+    -- ```
     ---@nodiscard
     ---@generic T
     ---@param self Stream<T>
@@ -665,6 +819,11 @@ function Stream.from(iterable)
         return self
     end
 
+    -- Filters the stream using the specified predicate, dropping all elements
+    -- that do not test true, then returns the stream.
+    -- <br><br>Example: `stream{0, 1, 0, 2}:filter(function(x) return x ~= 0 end):collect()` results in `{1, 2}`.
+    --
+    ---@see filter
     ---@nodiscard
     ---@generic T
     ---@param self Stream<T>
@@ -675,6 +834,11 @@ function Stream.from(iterable)
         return self
     end
 
+    -- Maps each element in the stream to the result of applying the mapper function
+    -- to the element, then returns the stream.
+    -- <br><br>Example: `stream{1, 2, 3}:map(function(x) return x + 1 end):collect()` results in `{2, 3, 4}`.
+    --
+    ---@see map
     ---@nodiscard
     ---@generic T
     ---@generic S
@@ -686,6 +850,11 @@ function Stream.from(iterable)
         return self
     end
 
+    -- Applies the mapper to each element in the stream, then includes the yielded
+    -- result iterables in the stream in order, then returns the stream.
+    -- <br><br>Example: `stream{1, 2, 3}:flatmap(function(x) return {x, x} end):collect()` results in `{1, 1, 2, 2, 3, 3}`.
+    --
+    ---@see flatmap
     ---@nodiscard
     ---@generic T
     ---@generic S
@@ -697,6 +866,11 @@ function Stream.from(iterable)
         return self
     end
 
+    -- Limits the amount of elements yielded by the stream to at most the specified
+    -- `amount`, then returns the stream.
+    -- <br><br>Example: `Stream.range(1, 5):limit(3):collect()` results in `{1, 2, 3}`.
+    --
+    ---@see limit
     ---@nodiscard
     ---@generic T
     ---@param self Stream<T>
@@ -707,6 +881,11 @@ function Stream.from(iterable)
         return self
     end
 
+    -- Skips the specified `amount` of elements from the start of the stream, then
+    -- returns the stream.
+    -- <br><br>Example: `Stream.range(1, 5):skip(3):collect()` results in `{4, 5}`.
+    --
+    ---@see skip
     ---@nodiscard
     ---@generic T
     ---@param self Stream<T>
@@ -717,6 +896,19 @@ function Stream.from(iterable)
         return self
     end
 
+    -- Calls the `consumer` function for each element yielded by the stream, then
+    -- yields that element, allowing further iterator chaining. This is mostly useful
+    -- for debugging complex iterator chains without collecting them.
+    -- <br><br> Note that, unlike the `stream:each` method, this is not a terminal operation.
+    -- <br><br> Example:
+    -- ```lua
+    -- local increment = partial(operators.add, 1)
+    -- local result = stream{1, 2, 3}:map(increment):peek(print):collect()
+    -- -- prints 2, then 3, then 4
+    -- -- result itself is equal to {2, 3, 4}
+    -- ```
+    --
+    ---@see peek
     ---@generic T
     ---@param self Stream<T>
     ---@param consumer fun(any)
@@ -726,12 +918,24 @@ function Stream.from(iterable)
         return self
     end
 
+    -- Calls the `consumer` function for each element yielded by the stream.
+    -- <br><br>**Note**: this is a **terminal operation**, returning nothing.
+    -- <br><br>Example: `stream{1, 2, 3}:each(print)` prints 1, then 2, then 3.
+    --
+    ---@see each
     ---@param consumer fun(any)
     ---@return nil
     function stream:each(consumer)
         each(iterator, consumer)
     end
 
+    -- Returns `true` if all elements yielded by the stream match the specified
+    -- predicate function, else returns `false`.
+    -- <br><br> Note: returns `true` for empty streams.
+    -- <br><br>**Note**: this is a **terminal operation**.
+    -- <br><br>Example: `stream{1, -1, 2}:all(function(x) return x > 0 end)` returns `false`.
+    --
+    ---@see all
     ---@nodiscard
     ---@generic T
     ---@param self Stream<T>
@@ -741,6 +945,15 @@ function Stream.from(iterable)
         return all(iterator, predicate)
     end
 
+    -- Collects the stream to a single aggregated result using the specified collector,
+    -- or to a table, if no collector is specified.
+    -- <br><br>**Note**: this is a **terminal operation**.
+    -- <br><br>**Warning**: collecting an infinite stream will result in an infinite loop.
+    -- <br><br>Examples:
+    -- * 1. `Stream.range(1, 5):collect()` returns `{1, 2, 3, 4, 5}`.
+    -- * 2. `stream{"a", "b", "c"}:collect(collectors.join)` returns `"abc"`.
+    --
+    ---@see collect
     ---@generic T
     ---@generic S
     ---@param self Stream<T>
@@ -750,6 +963,11 @@ function Stream.from(iterable)
         return collect(iterator, collector)
     end
 
+    -- Returns the count of elements yielded by the stream.
+    -- <br><br>**Note**: this is a **terminal operation**.
+    -- <br><br>Example: `stream{1, 3, 5}:count()` returns 3.
+    --
+    ---@see collectors.count
     ---@generic T
     ---@param self Stream<T>
     ---@return number
@@ -757,6 +975,12 @@ function Stream.from(iterable)
         return self:collect(collectors.count)
     end
 
+    -- Aggregates all elements yielded by the stream into a single result using
+    -- the provided `seed` and the `binary_operation` aggregator function.
+    -- <br><br>**Note**: this is a **terminal operation**.
+    -- <br><br>Example: `stream{1, 2, 3}:reduce(0, operators.add)` returns 6.
+    --
+    ---@see reduce
     ---@generic T
     ---@param self Stream<T>
     ---@param seed T
@@ -780,18 +1004,27 @@ function Stream.from(iterable)
     return stream
 end
 
+-- Returns a stream yielding numbers from `start` to `stop` (including both ends).
+-- <br>An optional third `step` parameter can be provided to control the interval
+-- between the yielded numbers.
+-- <br><br>**Warning**: produces an infinite iterator when `step` is 0 and `start` != `stop`.
+-- <br><br>Example: `Stream.range(1, 5):collect()` results in `{1, 2, 3, 4, 5}`.
+---@see range
 ---@param start number
 ---@param stop number
 ---@param step number?
----@return Stream
+---@return Stream<number>
 function Stream.range(start, stop, step)
     return Stream.from(range(start, stop, step))
 end
 
 local stream = Stream.from
 
+-- Concatenates all provided iterables into a single, un-nested stream yielding
+-- the elements of all iterables in sequence, then returns that stream.
+-- <br><br>Example: `Stream.concat(range(1, 3), {2}, stream{5, 4}):collect()` results in `{1, 2, 3, 2, 5, 4}`.
 ---@generic T
----@vararg Stream<T> | Iterator<T>
+---@vararg Iterable<T>
 ---@return Stream<T>
 function Stream.concat(...)
     local streams = {...}
@@ -802,11 +1035,14 @@ end
 ---@alias IteratorMapper fun(iterable: Iterable<T>): Iterator<T>
 ---@class Gatherers
 ---@field batch fun(batch_size: number): IteratorMapper
+-- Provides implementations for stream gatherers that can be used to transform elements
+-- yielded by a stream into item collections via the `stream:apply` method.
+-- <br><br>Example: `Stream.range(1, 6):apply(gatherers.batch(2)):collect()` results in `{{1, 2}, {3, 4} {5, 6}}`.
 local gatherers = {
 
     -- Can be used to gather items yielded from an iterable into batches of a specified size.
-    -- <br/>Example: `Stream.range(1, 6):apply(gatherers.batch(2)):collect()` results in `{{1, 2}, {3, 4} {5, 6}}`.
-    -- <br/>Note: this is a factory function for an iterator function factory.
+    -- <br><br>Example: `Stream.range(1, 6):apply(gatherers.batch(2)):collect()` results in `{{1, 2}, {3, 4} {5, 6}}`.
+    -- <br><br>Note: this is a factory function for an iterator function factory.
     batch = function (batch_size)
         if batch_size <= 0 then
             error("Specified batch size should be greater than zero!", 2)
@@ -818,12 +1054,15 @@ local gatherers = {
 
             -- the actual iterator function
             return function()
-                local values = {}
-                each(range(1, batch_size), function(_) table.insert(values, iterator()) end)
-                if values[1] == nil then
+                local values_ = {}
+                each(range(1, batch_size), function(_)
+                    local value = iterator()
+                    table.insert(values_, value)
+                end)
+                if values_[1] == nil then
                     return nil
                 end
-                return values
+                return values_
             end
         end
     end
