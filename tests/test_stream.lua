@@ -223,6 +223,12 @@ function TestStream:testStreamApplyBatcher()
     test.assertEquals(fn.Stream.range(1, 9):apply(batch(3)):map(function(table) return fn.collect(table, fn.collectors.sum) end):collect(), {(1 + 2 + 3), (4 + 5 + 6), (7 + 8 + 9)})
 end
 
+function TestStream:testZeroBatcher()
+    local status, message = pcall(fn.gatherers.batch, 0)
+    test.assertFalse(status)
+    test.assertEquals(message, "Specified batch size should be greater than zero!")
+end
+
 function TestStream:testEmptyStream()
     test.assertEquals(fn.stream():collect(), {})
 end
@@ -529,6 +535,14 @@ end
 
 function TestStream:testLimitTable()
     test.assertEquals(fn.collect(fn.limit({1, 2, 3, 4, 5}, 3)), {1, 2, 3})
+end
+
+function TestStream:testLimitLargerThanTable()
+    test.assertEquals(fn.collect(fn.limit({1, 2, 3}, 5)), {1, 2, 3})
+end
+
+function TestStream:testLimitEmptyTable()
+    test.assertEquals(fn.collect(fn.limit({}, 3)), {})
 end
 
 function TestStream:testSkipTable()
