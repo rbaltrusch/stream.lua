@@ -1,6 +1,6 @@
 # stream.lua
 
-This small, single-file library is an iterator-chaining library implementing common functional programming patterns such as `map`, `filter`, and `reduce`:
+This single-file library is an iterator-chaining library implementing common functional programming patterns such as lazily-computed iterators `map`, `filter`, and `reduce`, a `Stream` class providing iterator-chaining via a fluent interface, and a number of [function utilities](#utilities).
 
 For example, instead of the traditional approach using a for-loop with an if-statement to aggregate transformed data:
 
@@ -46,6 +46,14 @@ local second_value = stream.iterator() -- gets second value... ==> 5
 This means, that all iterator functions can also be nested (similar to Python), e.g. `map(f, filter({1, 2, 3}, f2))`.
 
 An added benefit of using the library is that performance seems to be better than the traditional for-loop approach, although this is not the focus or main benefit of this library and as such is not guaranteed.
+
+## Getting started
+
+To use the library, download the [stream.lua](stream.lua) file and include it in your project, then require it in your source code and you are all set up:
+
+```lua
+local fn = require "stream"
+```
 
 ## Documentation
 
