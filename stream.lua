@@ -4,11 +4,7 @@
 --
 -- Author: R. Baltrusch
 
--- todo: distinct (unique)
--- todo: stream.any
--- todo moving window stream gatherer
--- todo expose each collector as separate function ? e.g. standalone join function
--- todo change cycle from eager collection to lazy collection.
+-- todo document how iterator functions work - also termination on nil
 
 -- A function that yields items, or `nil` to signify termination. Can be used in generic for-loops.
 ---@generic T
@@ -513,6 +509,21 @@ local function peek(iterable, consumer)
     return map(iterable, mapper)
 end
 
+-- Returns an iterator function that only yields distinct (unique) elements from the
+-- original iterable.
+-- <br><br>Example: `distinct{1, 3, 2, 3, 5, 1}` yields 1, 3, 2 and 5.
+---@nodiscard
+---@generic T
+---@param iterable Iterable<T>
+---@return Iterable<T>
+local function distinct(iterable)
+    local seen = {}
+    return peek(
+        filter(iterable, function(x) return seen[x] == nil end),
+        function(x) seen[x] = true end
+    )
+end
+
 -- Reduces the arity (amount of arguments) of a function by returning a closure
 -- calling the specified function with all specified arguments pre-applied.
 -- <br><br>Example:
@@ -707,6 +718,45 @@ local function collect(iterable, collector)
     return new_collector:get()
 end
 
+-- Returns the count of elements yielded by an iterable.
+-- <br><br>Equivalent to `collect(iterable, collectors.count)`.
+---@param iterable Iterable<any>
+---@return number
+local count = function(iterable) return collect(iterable, collectors.count) end
+
+-- Returns the sum of all numbers yielded by a numeric iterable.
+-- <br><br>Equivalent to `collect(iterable, collectors.sum)`.
+---@param iterable Iterable<number>
+---@return number
+local sum = function(iterable) return collect(iterable, collectors.sum) end
+
+-- Returns the smallest number yielded by a numeric iterable.
+-- <br><br>Equivalent to `collect(iterable, collectors.min)`.
+---@param iterable Iterable<number>
+---@return number
+local min = function(iterable) return collect(iterable, collectors.min) end
+
+-- Returns the largest number yielded by a numeric iterable.
+-- <br><br>Equivalent to `collect(iterable, collectors.max)`.
+---@param iterable Iterable<number>
+---@return number
+local max = function(iterable) return collect(iterable, collectors.max) end
+
+-- Returns the average of all numbers yielded by a numeric iterable.
+-- <br><br>Equivalent to `collect(iterable, collectors.average)`.
+---@param iterable Iterable<number>
+---@return number
+local average = function(iterable) return collect(iterable, collectors.average) end
+
+-- Returns a collector that joins all strings yielded by an iterable into
+-- a single string, optionally delimited by the specified string delimiter.
+-- <br><br>Equivalent to `collect(iterable, collectors.join(delimiter))`.
+---@generic T
+---@param iterable Iterable<T>
+---@param delimiter string?
+---@return string
+local join = function(iterable, delimiter) return collect(iterable, collectors.join(delimiter)) end
+
 -- Returns an iterator function that yields items from all iterables provided.
 -- <br><br>Example:
 -- ```lua
@@ -816,6 +866,17 @@ function Stream.from(iterable)
     ---@return Stream<T>
     function stream:apply(mapper)
         iterator = mapper(iterator)
+        return self
+    end
+
+    -- Changes the stream to only yield distinct (unique) elements.
+    -- <br><br>Example: `stream{1, 2, 3, 2, 1}:distinct():count()` returns 3.
+    ---@nodiscard
+    ---@generic T
+    ---@param self Stream<T>
+    ---@return Stream<T>
+    function stream:distinct()
+        iterator = distinct(iterator)
         return self
     end
 
@@ -945,6 +1006,22 @@ function Stream.from(iterable)
         return all(iterator, predicate)
     end
 
+    -- Returns `true` if any element yielded by the stream matches the specified
+    -- predicate function, else returns `false`.
+    -- <br><br> Note: returns `false` for empty streams.
+    -- <br><br>**Note**: this is a **terminal operation**.
+    -- <br><br>Example: `stream{0, 1, -2}:any(function(x) return x > 0 end)` returns `true`.
+    --
+    ---@see all
+    ---@nodiscard
+    ---@generic T
+    ---@param self Stream<T>
+    ---@param predicate (fun(T): boolean)?
+    ---@return boolean
+    function stream:any(predicate)
+        return any(iterator, predicate)
+    end
+
     -- Collects the stream to a single aggregated result using the specified collector,
     -- or to a table, if no collector is specified.
     -- <br><br>**Note**: this is a **terminal operation**.
@@ -1035,6 +1112,7 @@ end
 ---@alias IteratorMapper fun(iterable: Iterable<T>): Iterator<T>
 ---@class Gatherers
 ---@field batch fun(batch_size: number): IteratorMapper
+---@field window fun(window_size: number): IteratorMapper
 -- Provides implementations for stream gatherers that can be used to transform elements
 -- yielded by a stream into item collections via the `stream:apply` method.
 -- <br><br>Example: `Stream.range(1, 6):apply(gatherers.batch(2)):collect()` results in `{{1, 2}, {3, 4} {5, 6}}`.
@@ -1065,6 +1143,41 @@ local gatherers = {
                 return values_
             end
         end
+    end,
+
+    -- Can be used to gather items yielded from an iterable into a moving window (table) of a specified size.
+    -- <br><br>Example: `Stream.range(1, 4):apply(gatherers.window(3)):collect()`
+    -- results in `{{1}, {1, 2}, {1, 2, 3}, {2, 3, 4}}`.
+    -- <br><br>Note: this is a factory function for an iterator function factory.
+    window = function(window_size)
+        if window_size <= 0 then
+            error("Specified window size should be greater than zero!", 2)
+        end
+
+        local first = operators.first
+
+        local function create_collector()
+            local value = nil
+            return {
+                collect = function(x) value = x end,
+                get = function() return value end
+            }
+        end
+
+        -- iterator function factory
+        return function(iterable)
+            local collectors_ = collect(map(range(1, window_size), create_collector))
+            local collector_iter = cycle(collectors_)
+            local iterator = peek(iterable, function(x) collector_iter().collect(x) end)
+
+            -- the actual iterator function
+            return map(iterator, function ()
+                local limited_collectors = limit(collector_iter, window_size)
+                local values_ = map(limited_collectors, function(x) return {x.get()} end)
+                local filtered_values = map(filter(values_, first), first)
+                return collect(filtered_values)
+            end)
+        end
     end
 }
 
@@ -1076,6 +1189,7 @@ return {
     items = items,
     cycle = cycle,
     reversed = reversed,
+    distinct = distinct,
     filter = filter,
     map = map,
     flatmap = flatmap,
@@ -1092,6 +1206,12 @@ return {
     zip = zip,
     any = any,
     all = all,
+    count = count,
+    sum = sum,
+    min = min,
+    max = max,
+    average = average,
+    join = join,
     stream = stream,
     Stream = Stream,
     collectors = collectors,

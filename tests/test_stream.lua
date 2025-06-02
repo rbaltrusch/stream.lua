@@ -223,10 +223,50 @@ function TestStream:testStreamApplyBatcher()
     test.assertEquals(fn.Stream.range(1, 9):apply(batch(3)):map(function(table) return fn.collect(table, fn.collectors.sum) end):collect(), {(1 + 2 + 3), (4 + 5 + 6), (7 + 8 + 9)})
 end
 
+function TestStream:testIterableBatcher()
+    local batcher = fn.gatherers.batch(2)
+    test.assertEquals(fn.collect(batcher(fn.range(1, 4))), {{1, 2}, {3, 4}})
+end
+
+function TestStream:testStatelessBatcher()
+    local batcher = fn.gatherers.batch(2)
+    test.assertEquals(fn.Stream.range(1, 4):apply(batcher):collect(), {{1, 2}, {3, 4}})
+    test.assertEquals(fn.Stream.range(1, 4):apply(batcher):collect(), {{1, 2}, {3, 4}})
+end
+
 function TestStream:testZeroBatcher()
     local status, message = pcall(fn.gatherers.batch, 0)
     test.assertFalse(status)
     test.assertEquals(message, "Specified batch size should be greater than zero!")
+end
+
+function TestStream:testStreamApplyWindow()
+    local window = fn.gatherers.window
+    test.assertEquals(stream{}:apply(window(3)):collect(), {})
+    test.assertEquals(fn.Stream.range(1, 4):apply(window(3)):collect(), {{1}, {1, 2}, {1, 2, 3}, {2, 3, 4}})
+    test.assertEquals(stream{1, 2}:apply(window(3)):collect(), {{1}, {1, 2}})
+end
+
+function TestStream:testIterableWindow()
+    local window = fn.gatherers.window(3)
+    test.assertEquals(fn.collect(window(fn.range(1, 4))), {{1}, {1, 2}, {1, 2, 3}, {2, 3, 4}})
+end
+
+function TestStream:testStatelessWindow()
+    local window = fn.gatherers.window(2)
+    test.assertEquals(stream{1, 2}:apply(window):collect(), {{1}, {1, 2}})
+    test.assertEquals(stream{1, 2}:apply(window):collect(), {{1}, {1, 2}})
+end
+
+function TestStream:testZeroWindow()
+    local status, message = pcall(fn.gatherers.window, 0)
+    test.assertFalse(status)
+    test.assertEquals(message, "Specified window size should be greater than zero!")
+end
+
+function TestStream:testDistinctStream()
+    test.assertEquals(stream{1, 3, 5, 3, 2, 3, 1}:distinct():collect(), {1, 3, 5, 2})
+    test.assertEquals(stream{1, 3, 5, 3, 2, 3, 1}:map(function(x) return x * x end):distinct():collect(), {1, 9, 25, 4})
 end
 
 function TestStream:testEmptyStream()
@@ -429,6 +469,16 @@ end
 function TestStream:testStreamAll()
     test.assertTrue(stream{1, 2, 3}:all(function(x) return x > 0 end))
     test.assertFalse(stream{1, -2, 3}:all(function(x) return x > 0 end))
+end
+
+function TestStream:testStreamAnyNoPredicate()
+    test.assertTrue(stream{true, true, false}:any())
+    test.assertFalse(stream{false, false, false}:any())
+end
+
+function TestStream:testStreamAny()
+    test.assertTrue(stream{0, 2, -1}:any(function(x) return x > 0 end))
+    test.assertFalse(stream{-1, -2, -3}:any(function(x) return x > 0 end))
 end
 
 function TestStream:testStreamConcat()
@@ -657,6 +707,57 @@ end
 
 function TestStream:testCycleAmounts()
     test.assertEquals(fn.collect(fn.cycle({1, 2, 3}, 2)), {1, 2, 3, 1, 2, 3})
+end
+
+function TestStream:testCycleZero()
+    test.assertEquals(fn.collect(fn.cycle({1, 2, 3}, 0)), {})
+    test.assertEquals(fn.collect(fn.cycle({1, 2, 3}, -1)), {})
+end
+
+function TestStream:testCycleEmpty()
+    test.assertEquals(fn.collect(fn.cycle{}), {})
+    test.assertEquals(fn.collect(fn.cycle({}, 1)), {})
+end
+
+function TestStream:testLazyCycle()
+    local infinite = function () return 1 end
+    local cycled = fn.cycle(infinite) -- lazily collected
+    test.assertEquals(fn.collect(fn.limit(cycled, 5)), {1, 1, 1, 1, 1})
+end
+
+function TestStream:testDistinct()
+    test.assertEquals(fn.collect(fn.distinct{1, 1, 3, 2, 1}), {1, 3, 2})
+end
+
+function TestStream:testDistinctEmpty()
+    test.assertEquals(fn.collect(fn.distinct{}), {})
+end
+
+function TestStream:testStandaloneCount()
+    test.assertEquals(fn.count(fn.range(1, 10)), 10)
+end
+
+function TestStream:testStandaloneSum()
+    test.assertEquals(fn.sum(fn.range(1, 5)), 15)
+end
+
+function TestStream:testStandaloneMin()
+    test.assertEquals(fn.min{1, -1, 0}, -1)
+end
+
+function TestStream:testStandaloneMax()
+    test.assertEquals(fn.max{2, 5, -7}, 5)
+end
+
+function TestStream:testStandaloneAverage()
+    test.assertEquals(fn.average(fn.range(1, 6)), 3.5)
+end
+
+function TestStream:testStandaloneJoin()
+    test.assertEquals(fn.join{}, "")
+    test.assertEquals(fn.join({"ere", "gere"}), "eregere")
+    test.assertEquals(fn.join({"aba", "cab"}, ":"), "aba:cab")
+    test.assertEquals(fn.join("abc", ";"), "a;b;c")
 end
 
 function TestStream:testAdd()

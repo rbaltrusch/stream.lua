@@ -68,6 +68,7 @@ local fn = require "stream"
 
 - `iter(Iterable<T>): Iterator<T>`: constructs an `Iterator` from a table or string. If the argument isn't a table or string, this function assumes it must be an iterator function of type `() => T`. Note that a stateless iterator function (e.g. `function() return 1 end`) results in infinite iterators.
 - `range(start: int, stop: int, step: int?): Iterator<int>`: constructs a numeric `Iterator` yielding numbers from start to stop (including both ends). Takes an optional `step` parameter.
+- `distinct(Iterable<T>): Iterable<T>`: yields all elements of the iterator, skipping elements that were already yielded.
 - `cycle(Iterable<T>): Iterable<T>`: yields all elements of the iterator, repeatedly and infinitely. Note that this collects the iterator eagerly.
 - `reversed(Iterable<T>): Iterable<T>`: yields all elements of the iterator in reverse order. Note that this collects the iterator eagerly.
 - `filter(Iterable<T>, T => boolean): Iterator<T>`: yields all elements for which the supplied predicate function returns `true`. Note: omitting the optional predicate function yields all truthy elements.
@@ -83,6 +84,8 @@ local fn = require "stream"
 - `collect(Iterable<T>, collector): table<T>`: collects all elements of the iterator into an arbitrary format specified by the collector. Collectors provided by `stream.lua` are available under `collectors` (documented [here](#collectors)). This is a terminal operation.
 - `any(Iterable<T>, T => boolean): boolean`: returns `true` if any element in the iterable matches the supplied predicate function. This is a terminal operation.
 - `all(Iterable<T>, T => boolean): boolean`: returns `true` if all elements in the iterable match the supplied predicate function. This is a terminal operation.
+
+Some standalone collector functions (all of which being terminal operations) are also provided: `sum`, `count`, `average`, `min`, `max` and `join`.
 
 #### Object iterators
 
@@ -140,6 +143,8 @@ Provided default collectors are available under `collectors` and are:
 - `join(delimiter: string?)`: joins all strings yielded by a string iterable into a single string (optionally delimited with the specified delimiter), then returns the joined string.
 - `last`: returns the last element yielded by an iterable. (note that the first element can be retrieved simply by calling an iterator function once: `iter(something)()`)
 
+Some of the most useful of the provided collectors are also provided as standalone functions (equivalent to `collect(collector)`), these being: `sum`, `count`, `average`, `min`, `max` and `join`.
+
 Example collector usage:
 
 ```lua
@@ -172,6 +177,7 @@ Gatherers can be used with the `stream:apply` method to aggregate elements in th
 
 Provided default gatherers aer available under `gatherers` and are:
 - `batch(batch_size): Iterable<T> => Iterable<table<T>>`: returns an iterable mapper function that aggregates elements from the original iterable, yielding batches of the specified size (in table form).
+- `window(window_size): Iterable<T> => Iterable<table<T>>`: returns an iterable mapper function that aggregates elements from the original iterable, yielding sliding windows of the specified size (in table form). Note that the windows for the first elements may be smaller than the specified size, while elements are still being aggregated into windows (if required, these smaller windows can be filtered out with a `dropwhile` statement).
 
 Example:
 
