@@ -808,17 +808,40 @@ end
 
 -- Returns an infinite iterator function repeatedly yielding elements from the iterable,
 -- or a specified amount of times if the optional `repeats` argument is specified.
--- <br><br>**Note**: eagerly collects the original iterable.
+-- <br><br>**Note**: returns a nil iterator (yielding nothing) if repeats < 0 or
+-- the original iterable is empty.
 -- <br><br>Example: `cycle{1, 2}` yields 1, then 2, then 1, then 2...
 ---@generic T
 ---@param iterable Iterable<T>
 ---@param repeats number?
 ---@return Iterator<T>
 local function cycle(iterable, repeats)
-    local list = collect(iterable)
+    local iterator = iter(iterable)
+    local first = iterator()
+    -- handle empty iterables to avoid infinite iterators
+    if first == nil or repeats and repeats <= 0 then
+        return nil_iterator
+    end
+
+    local collector = collectors.table()
+    local list, count_ = nil, 0
+
+    -- first cycle, we collect yielded items into a list in the background, which can then be
+    -- used for all further cycles. This still collects the entire iterable, but does so lazily.
     local infinite = function() return 0 end
-    local mapped = flatmap(infinite, function(_) return iter(list) end)
-    return repeats and limit(mapped, repeats * #list) or mapped
+    local mapped = flatmap(infinite, function()
+        count_ = count_ + 1
+        if list then
+            return iter(list)
+        end
+
+        local finally = function() list = collector:get() end
+        iterator = flatmap({{first}, iterator, finally}, iter)
+        return peek(iterator, partial(collector.collect, collector))
+    end)
+
+    local below_max_count = function() return count_ <= repeats end
+    return repeats and takewhile(mapped, below_max_count) or mapped
 end
 
 -- Returns an iterator function yielding elements from the iterable in reverse order.

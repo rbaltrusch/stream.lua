@@ -69,7 +69,7 @@ local fn = require "stream"
 - `iter(Iterable<T>): Iterator<T>`: constructs an `Iterator` from a table or string. If the argument isn't a table or string, this function assumes it must be an iterator function of type `() => T`. Note that a stateless iterator function (e.g. `function() return 1 end`) results in infinite iterators.
 - `range(start: int, stop: int, step: int?): Iterator<int>`: constructs a numeric `Iterator` yielding numbers from start to stop (including both ends). Takes an optional `step` parameter.
 - `distinct(Iterable<T>): Iterable<T>`: yields all elements of the iterator, skipping elements that were already yielded.
-- `cycle(Iterable<T>): Iterable<T>`: yields all elements of the iterator, repeatedly and infinitely. Note that this collects the iterator eagerly.
+- `cycle(Iterable<T>): Iterable<T>`: yields all elements of the iterator, repeatedly and infinitely.
 - `reversed(Iterable<T>): Iterable<T>`: yields all elements of the iterator in reverse order. Note that this collects the iterator eagerly.
 - `filter(Iterable<T>, T => boolean): Iterator<T>`: yields all elements for which the supplied predicate function returns `true`. Note: omitting the optional predicate function yields all truthy elements.
 - `map(Iterator<T>, T => S): Iterator<S>`: applies the supplied mapping function to each element and yields them.
