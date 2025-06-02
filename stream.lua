@@ -1,12 +1,12 @@
 ---A functional programming library providing implementations of common lazy iterators,
 -- such as `map`, `filter` and `reduce`, both in standalone form, as well as in a chainable
--- form via the `Stream` class (e.g. `stream{1, 2, 3}:filter(...):map(...):limit(5):collect()`)
+-- form via the `Stream` class (e.g. `stream{1, 2, 3}:filter(...):map(...):limit(5):collect()`).
 --
 -- Author: R. Baltrusch
 
 -- todo document how iterator functions work - also termination on nil
 
--- A function that yields items, or `nil` to signify termination. Can be used in generic for-loops.
+-- A function that yields items, or `nil` to signify termination. Can be used in generic for-each loops.
 ---@generic T
 ---@class Iterator<T> fun(): T?
 
@@ -27,8 +27,8 @@
 
 -- Backwards compatibility for Lua 5.1 and below
 ---@diagnostic disable-next-line: deprecated
-table.unpack = table.unpack or unpack
-table.pack = table.pack or function(...) return { n = select("#", ...), ... } end
+table.unpack = table.unpack or unpack  -- luacheck:ignore 122 (read-only field)
+table.pack = table.pack or function(...) return { n = select("#", ...), ... } end  -- luacheck:ignore 122 631 (read-only field)
 
 -- A list of all Lua operators exposed as functions.
 local operators = {
@@ -485,9 +485,9 @@ local function reduce(iterable, seed, binary_operation)
     return accumulated
 end
 
--- Calls the `consumer` function for each element yielded by the iterable, then
--- yields that element, allowing further iterator chaining. This is mostly useful
--- for debugging complex iterator chains without collecting them.
+-- Returns an iterator function that calls the `consumer` function for each element yielded
+-- by the iterable, then yields that element, allowing further iterator chaining. This is
+-- mostly useful for debugging complex iterator chains without collecting them.
 -- <br><br> Note that, unlike the `each` iterator, this is not a terminal operation.
 -- <br><br> Example:
 -- ```lua
@@ -775,16 +775,14 @@ local function zip(...)
     local iterators = collect(map({...}, iter))
     local amount = #iterators
     return function()
-        while true do
-            local values = collect(map(iterators, operators.call))
+        local values_ = collect(map(iterators, operators.call))
 
-            -- preserves nils
-            local value_iter = map(range(1, amount), function(x) return {values[x]} end)
-            if any(value_iter, function(x) return x[1] == nil end) then
-                return nil
-            end
-            return table.unpack(values)
+        -- preserves nils
+        local value_iter = map(range(1, amount), function(x) return {values_[x]} end)
+        if any(value_iter, function(x) return x[1] == nil end) then
+            return nil
         end
+        return table.unpack(values_)
     end
 end
 
@@ -936,7 +934,8 @@ function Stream.from(iterable)
 
     -- Applies the mapper to each element in the stream, then includes the yielded
     -- result iterables in the stream in order, then returns the stream.
-    -- <br><br>Example: `stream{1, 2, 3}:flatmap(function(x) return {x, x} end):collect()` results in `{1, 1, 2, 2, 3, 3}`.
+    -- <br><br>Example: `stream{1, 2, 3}:flatmap(function(x) return {x, x} end):collect()`
+    -- results in `{1, 1, 2, 2, 3, 3}`.
     --
     ---@see flatmap
     ---@nodiscard
