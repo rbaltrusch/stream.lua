@@ -26,7 +26,7 @@ jobs:
         run: luarocks install luaunit
 
       - name: Build luarock
-        run: luarocks build streams-scm.rockspec.lua
+        run: luarocks build streams-scm.rockspec
 
       - name: Run regression tests
         run: luarocks test
