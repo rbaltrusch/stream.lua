@@ -1,6 +1,6 @@
 rockspec_format = "3.0"
 package = "streams"
-version = "scm"
+version = "scm-1"
 
 source = {
   url = "git+https://github.com/rbaltrusch/stream.lua",
