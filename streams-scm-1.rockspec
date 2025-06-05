@@ -4,7 +4,7 @@ version = "scm-1"
 
 source = {
   url = "git+https://github.com/rbaltrusch/stream.lua",
-  branch = "main", -- this will be replaced by the release workflow
+  branch = "master", -- this will be replaced by the release workflow
 }
 
 description = {
