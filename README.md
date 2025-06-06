@@ -49,7 +49,7 @@ An added benefit of using the library is that performance seems to be better tha
 
 ## Getting started
 
-To use the library, download the [stream.lua](stream.lua) file and include it in your project, then require it in your source code and you are all set up:
+To use the library, install the library using `luarocks install streams`, or download the [stream.lua](https://github.com/rbaltrusch/stream.lua/blob/master/stream.lua) file and include it in your project, then require it in your source code and you are all set up:
 
 ```lua
 local fn = require "stream"
@@ -269,7 +269,7 @@ start luacov.report.html
 
 ## Lua version
 
-Written for Lua 5.1, but should also work for all other versions of Lua.
+Written for Lua 5.1 and higher.
 
 ## License
 
